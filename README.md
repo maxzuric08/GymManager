@@ -9,4 +9,4 @@ El proyecto tiene como objetivo principal **desarrollar un sistema que centralic
 Dentro de todas las opciones, la web podrá registrar y administrar los clientes, gestionar planes de membresía con sus beneficios, precios y duraciones, junto a sus vencimientos y avisos de los mismos, administrar clases grupales junto a un profesional, permitir reservas/cancelaciones 
 automáticos, gestionar pagos/detectar atrasos en estos, entre otros. 
 
-Este proyecto **no está pensado para** creación de rutinas, o gestión personal de cada cliente, sino para la administración general de una compañía de un gimnasio.
+Este proyecto **no está pensado para** creación de rutinas, o gestión personal de cada cliente, sino para la administración general de una empresa de un gimnasio.
