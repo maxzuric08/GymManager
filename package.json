@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:init": "psql -U postgres -d gymmanager -f ./database/schema_v2_english.sql"
   },
   "keywords": [],
   "author": "",
