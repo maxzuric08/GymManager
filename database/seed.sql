@@ -1,4 +1,43 @@
+-- =========================
+-- ADMIN (para login)
+-- =========================
+INSERT INTO administrators (
+    username,
+    password,
+    hierarchy,
+    first_name,
+    last_name,
+    email,
+    phone
+)
+VALUES (
+           'admin1',
+           '123456',
+           'superadmin',
+           'Admin',
+           'Principal',
+           'admin@gym.com',
+            '111111111'
+       );
+
+-- =========================
+-- PLAN
+-- =========================
+INSERT INTO plans (plan_type, cost, duration)
+VALUES ('Basico', 10000, '1 mes');
+
+-- =========================
+-- SEDE
+-- =========================
+INSERT INTO branches (location, size)
+VALUES ('Temuco', 'Grande');
+
+-- =========================
+-- USUARIO (LO DE TU AMIGO CORREGIDO)
+-- =========================
 INSERT INTO users (
+    branch_id,
+    plan_id,
     username,
     password,
     dni,
@@ -9,6 +48,8 @@ INSERT INTO users (
     birth_date
 )
 VALUES (
+           1,  -- viene de branches
+           1,  -- viene de plans
            'juan123',
            '123456',
            '12345678',
