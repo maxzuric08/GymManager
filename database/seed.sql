@@ -33,7 +33,7 @@ INSERT INTO branches (location, size)
 VALUES ('Temuco', 'Grande');
 
 -- =========================
--- USUARIO (LO DE TU AMIGO CORREGIDO)
+-- USUARIO
 -- =========================
 INSERT INTO users (
     branch_id,
