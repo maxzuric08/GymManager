@@ -6,7 +6,7 @@ const PORT = 3000;
 
 app.use(express.json());
 
-// Ruta de prueba
+// Chequeamos si el backend está funcionando bien
 app.get("/", async (req, res) => {
     try {
         const result = await pool.query("SELECT NOW()");
@@ -20,7 +20,7 @@ app.get("/", async (req, res) => {
     }
 });
 
-// LOGIN / LOGOUT
+// login y logout simple, falta ponerle la lógica para que funcione en el front
 app.post("/login", async (req, res) => {
     try {
         const { username, password, role } = req.body;
@@ -58,7 +58,8 @@ app.post("/logout", (req, res) => {
     res.json({ message: "Logout exitoso" });
 });
 
-// ABM USUARIOS
+// ABM USUARIOS ( Alta, baja y modificación de usuario )
+// get trae todos los usuarios inscriptos
 app.get("/users", async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM users ORDER BY user_id ASC");
@@ -69,6 +70,7 @@ app.get("/users", async (req, res) => {
     }
 });
 
+// esta función la va a usar el admin para crear usuarios
 app.post("/users", async (req, res) => {
     try {
         const {
@@ -99,6 +101,7 @@ app.post("/users", async (req, res) => {
     }
 });
 
+// Actualiza un usuarios ya creado
 app.put("/users/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -143,6 +146,7 @@ app.put("/users/:id", async (req, res) => {
     }
 });
 
+// Elimina el usuario
 app.delete("/users/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -163,8 +167,9 @@ app.delete("/users/:id", async (req, res) => {
     }
 });
 
-// ABM INSTRUCTORES
+// ABM INSTRUCTORES ( Alta, baja y modificaciond e instructores)
 
+// Obtienes todos los instructores
 app.get("/instructors", async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM instructors ORDER BY instructor_id ASC");
@@ -174,6 +179,8 @@ app.get("/instructors", async (req, res) => {
         res.status(500).json({ error: "Error al obtener instructores" });
     }
 });
+
+// Funcion del admin para crear nuevos instructores
 
 app.post("/instructors", async (req, res) => {
     try {
@@ -193,6 +200,7 @@ app.post("/instructors", async (req, res) => {
     }
 });
 
+// Actualiza instructores
 app.put("/instructors/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -220,6 +228,8 @@ app.put("/instructors/:id", async (req, res) => {
     }
 });
 
+// Elimina instructores
+
 app.delete("/instructors/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -241,7 +251,7 @@ app.delete("/instructors/:id", async (req, res) => {
 });
 
 // ABM PLANS (MEMBRESÍAS)
-
+// Obtenemos todos los planes
 app.get("/plans", async (req, res) => {
     try {
         const result = await pool.query("SELECT * FROM plans ORDER BY plan_id ASC");
@@ -252,6 +262,7 @@ app.get("/plans", async (req, res) => {
     }
 });
 
+// Creo un nuevo plan
 app.post("/plans", async (req, res) => {
     try {
         const { plan_type, cost, duration, benefits, class_limit, status } = req.body;
@@ -270,6 +281,7 @@ app.post("/plans", async (req, res) => {
     }
 });
 
+// Actualizo algún plan
 app.put("/plans/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -299,6 +311,7 @@ app.put("/plans/:id", async (req, res) => {
     }
 });
 
+// Elimino un plan
 app.delete("/plans/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -319,9 +332,9 @@ app.delete("/plans/:id", async (req, res) => {
     }
 });
 
-// =====================================
-// SELECCIONAR MEMBRESÍA PARA USUARIO
-// =====================================
+
+
+//  Funcion que actualiza el plan del usuario
 app.put("/users/:id/plan", async (req, res) => {
     try {
         const { id } = req.params;
@@ -346,6 +359,7 @@ app.put("/users/:id/plan", async (req, res) => {
     }
 });
 
+// Levantas el servidor
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en puerto ${PORT}`);
 });
