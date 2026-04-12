@@ -55,7 +55,7 @@ const updateInstructor = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: "Error al actualizar instructor" });
     }
-});
+};
 
 
 const deleteInstructor = async (req, res) => {
@@ -76,7 +76,7 @@ const deleteInstructor = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: "Error al eliminar instructor" });
     }
-});
+};
 
 module.exports = {
     getInstructors,

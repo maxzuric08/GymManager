@@ -50,7 +50,7 @@ const updateClass = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: "Error al actualizar la clase" });
     }
-});
+};
 
 const deleteClass = async (req, res) => {
     try {
@@ -70,7 +70,7 @@ const deleteClass = async (req, res) => {
         console.error(error);
         res.status(500).json({ error: "Error al eliminar la clase" });
     }
-});
+};
 
 module.exports = {
     getClasses,

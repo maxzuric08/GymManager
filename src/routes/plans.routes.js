@@ -6,6 +6,6 @@ router.get("/", planController.getPlans);
 router.post("/", planController.createPlan);
 router.put("/:id", planController.updatePlan);
 router.delete("/:id",planController.deletePlan);
-router.put("/:id", planController.updateUserPlan);
+router.put("/user/:id", planController.updateUserPlan);
 
 module.exports = router;
