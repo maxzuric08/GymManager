@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { loginRequest } from "../services/api";
 
 export default function Login() {
@@ -7,6 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,7 +23,19 @@ export default function Login() {
         role,
       });
 
+      localStorage.setItem("token", result.token);
+      localStorage.setItem("user", JSON.stringify(result.user));
+      localStorage.setItem("role", result.role);
+
       setMessage(`Bienvenido ${result.user.username} (${result.role})`);
+
+      if (result.role === "admin") {
+        navigate("/admin");
+      } else if (result.role === "instructor") {
+        navigate("/instructor");
+      } else if (result.role === "user") {
+        navigate("/user");
+      }
 
       console.log("Respuesta backend:", result);
     } catch (err) {

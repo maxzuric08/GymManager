@@ -1,5 +1,5 @@
-
 const pool = require("../db");
+const jwt = require("jsonwebtoken");
 
 const login = async (req, res) => {
     try {
@@ -23,13 +23,29 @@ const login = async (req, res) => {
             return res.status(401).json({ error: "Credenciales incorrectas" });
         }
 
+        const user = result.rows[0];
+
+        const token = jwt.sign(
+            {
+                id:
+                    user.admin_id ||
+                    user.instructor_id ||
+                    user.user_id,
+                username: user.username,
+                role: role
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
         res.json({
             message: "Login exitoso",
+            token,
             role,
-            user: result.rows[0]
+            user
         });
-
     } catch (error) {
+        console.error(error);
         res.status(500).json({ error: "Error en login" });
     }
 };
