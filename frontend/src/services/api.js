@@ -111,3 +111,43 @@ export async function createClassRequest(classData) {
 
   return data;
 }
+
+export async function getInstructorsRequest() {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/instructors`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener instructores");
+  }
+
+  return data;
+}
+
+export async function createInstructorRequest(instructorData) {
+  const token = localStorage.getItem("token");
+
+  const response = await fetch(`${API_URL}/instructors`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(instructorData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al crear instructor");
+  }
+
+  return data;
+}
