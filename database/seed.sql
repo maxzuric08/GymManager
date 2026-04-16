@@ -23,14 +23,14 @@ VALUES (
 -- =========================
 -- PLAN
 -- =========================
-INSERT INTO plans (plan_type, cost, duration)
-VALUES ('Basico', 10000, '1 mes');
+INSERT INTO plans (plan_type, cost, duration, benefits, class_limit, status)
+VALUES ('Mensual', 20000, '30 días', 'Acceso general', 20, 'active');
 
 -- =========================
 -- SEDE
 -- =========================
 INSERT INTO branches (location, size)
-VALUES ('Temuco', 'Grande');
+VALUES ('Pilar', 'Grande');
 
 -- =========================
 -- USUARIO
@@ -59,3 +59,4 @@ VALUES (
            '123456789',
            '1995-06-10'
        );
+

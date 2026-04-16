@@ -1,4 +1,12 @@
 const API_URL = "http://localhost:3000";
+function getAuthHeaders() {
+  const token = localStorage.getItem("token");
+
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+}
 
 export async function loginRequest(loginData) {
   const response = await fetch(`${API_URL}/auth/login`, {
@@ -39,10 +47,19 @@ export async function getUsersRequest() {
 
 export async function logoutRequest() {
   const response = await fetch(`${API_URL}/auth/logout`, {
-    method: "POST"
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
   });
 
-  return response.json();
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error en logout");
+  }
+
+  return data;
 }
 
 export async function createUserRequest(userData) {
