@@ -1,10 +1,11 @@
 const API_URL = "http://localhost:3000";
+
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
 
   return {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${token}`,
+    Authorization: `Bearer ${token}`,
   };
 }
 
@@ -21,25 +22,6 @@ export async function loginRequest(loginData) {
 
   if (!response.ok) {
     throw new Error(data.error || "Error en login");
-  }
-
-  return data;
-}
-
-export async function getUsersRequest() {
-  const token = localStorage.getItem("token");
-
-  const response = await fetch(`${API_URL}/users`, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${token}`
-    }
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Error al obtener usuarios");
   }
 
   return data;
@@ -62,15 +44,27 @@ export async function logoutRequest() {
   return data;
 }
 
-export async function createUserRequest(userData) {
-  const token = localStorage.getItem("token"); // Buscamos la pulsera VIP
+export async function getUsersRequest() {
+  const response = await fetch(`${API_URL}/users`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
 
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener usuarios");
+  }
+
+  return data;
+}
+
+export async function createUserRequest(userData) {
   const response = await fetch(`${API_URL}/users`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}` // Le mostramos la pulsera al backend
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(userData),
   });
 
@@ -83,42 +77,11 @@ export async function createUserRequest(userData) {
   return data;
 }
 
-export async function getClassesRequest() {
-  const response = await fetch(`${API_URL}/classes`);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Error al obtener clases");
-  }
-
-  return data;
-}
-
-export async function createClassRequest(classData) {
-  const response = await fetch(`${API_URL}/classes`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(classData),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Error al crear la clase");
-  }
-
-  return data;
-}
-
 export async function getInstructorsRequest() {
-  const token = localStorage.getItem("token");
-
   const response = await fetch(`${API_URL}/instructors`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
   });
 
@@ -132,14 +95,9 @@ export async function getInstructorsRequest() {
 }
 
 export async function createInstructorRequest(instructorData) {
-  const token = localStorage.getItem("token");
-
   const response = await fetch(`${API_URL}/instructors`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: getAuthHeaders(),
     body: JSON.stringify(instructorData),
   });
 
@@ -147,6 +105,72 @@ export async function createInstructorRequest(instructorData) {
 
   if (!response.ok) {
     throw new Error(data.error || "Error al crear instructor");
+  }
+
+  return data;
+}
+
+export async function getPlansRequest() {
+  const response = await fetch(`${API_URL}/plans`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener planes");
+  }
+
+  return data;
+}
+
+export async function createPlanRequest(planData) {
+  const response = await fetch(`${API_URL}/plans`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(planData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al crear plan");
+  }
+
+  return data;
+}
+
+export async function getClassesRequest() {
+  const response = await fetch(`${API_URL}/classes`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener clases");
+  }
+
+  return data;
+}
+
+export async function createClassRequest(classData) {
+  const response = await fetch(`${API_URL}/classes`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(classData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al crear la clase");
   }
 
   return data;
