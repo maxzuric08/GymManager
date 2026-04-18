@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { getPlansRequest, createPlanRequest } from "../../services/api";
+import { getPlansRequest, createPlanRequest, updatePlanRequest, deletePlanRequest } from "../../services/api";
 
 export default function PlansPanel() {
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
 
   const [formData, setFormData] = useState({
     plan_type: "",
@@ -32,32 +33,89 @@ export default function PlansPanel() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+    const handleSubmit = async (e) => {
+      e.preventDefault();
 
-    try {
-      await createPlanRequest(formData);
-      setShowForm(false);
-      fetchPlans();
+      try {
+        if (editingPlan) {
+          await updatePlanRequest(editingPlan, formData);
+        } else {
+          await createPlanRequest(formData);
+        }
 
-      setFormData({
-        plan_type: "",
-        cost: "",
-        duration: "",
-        benefits: "",
-        class_limit: "",
-        status: "active",
-      });
-    } catch (err) {
-      alert(err.message);
-    }
-  };
+        setShowForm(false);
+        setEditingPlan(null);
+        fetchPlans();
+
+        setFormData({
+          plan_type: "",
+          cost: "",
+          duration: "",
+          benefits: "",
+          class_limit: "",
+          status: "active",
+        });
+      } catch (err) {
+        alert(err.message);
+      }
+    };
+
+
+    const handleEdit = (plan) => {
+        setEditingPlan(plan.plan_id);
+        setShowForm(true);
+        setFormData({
+            plan_type: plan.plan_type || "",
+            cost: plan.cost || "",
+            duration: plan.duration || "",
+            benefits: plan.benefits || "",
+            class_limit: plan.class_limit || "",
+            status: plan.status || "active",
+            });
+        };
+
+
+    const handleDelete = async (id) => {
+          const confirmDelete = window.confirm("¿Seguro que quieres eliminar este plan?");
+          if (!confirmDelete) return;
+
+          try {
+            await deletePlanRequest(id);
+            fetchPlans();
+          } catch (err) {
+            alert(err.message);
+          }
+        };
+
+    const handleNewPlan = () => {
+          setEditingPlan(null);
+          setShowForm(true);
+
+          setFormData({
+            plan_type: "",
+            cost: "",
+            duration: "",
+            benefits: "",
+            class_limit: "",
+            status: "active",
+          });
+        };
 
   return (
     <div>
       <div style={styles.headerRow}>
         <h2>Gestión de Planes</h2>
-        <button onClick={() => setShowForm(!showForm)} style={styles.primaryBtn}>
+        <button
+          onClick={() => {
+            if (showForm) {
+              setShowForm(false);
+              setEditingPlan(null);
+            } else {
+              handleNewPlan();
+            }
+          }}
+          style={styles.primaryBtn}
+        >
           {showForm ? "Cancelar" : "+ Nuevo Plan"}
         </button>
       </div>
@@ -119,7 +177,7 @@ export default function PlansPanel() {
           </div>
 
           <button type="submit" style={{ ...styles.primaryBtn, marginTop: "1rem" }}>
-            Guardar Plan
+                {editingPlan ? "Actualizar Plan" : "Guardar Plan"}
           </button>
         </form>
       )}
@@ -133,6 +191,7 @@ export default function PlansPanel() {
             <th style={styles.th}>Duración</th>
             <th style={styles.th}>Límite</th>
             <th style={styles.th}>Estado</th>
+            <th style={styles.th}>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -144,6 +203,14 @@ export default function PlansPanel() {
               <td style={styles.td}>{plan.duration}</td>
               <td style={styles.td}>{plan.class_limit}</td>
               <td style={styles.td}>{plan.status}</td>
+              <td style={styles.td}>
+                <button onClick={() => handleEdit(plan)} style={styles.editBtn}>
+                  Editar
+                </button>
+                <button onClick={() => handleDelete(plan.plan_id)} style={styles.deleteBtn}>
+                  Eliminar
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -201,4 +268,20 @@ const styles = {
     borderRadius: "4px",
     border: "1px solid #ccc",
   },
+    editBtn: {
+      background: "#2563eb",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "8px",
+      marginRight: "8px",
+    },
+
+    deleteBtn: {
+      background: "#ef4444",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "8px",
+    },
 };
