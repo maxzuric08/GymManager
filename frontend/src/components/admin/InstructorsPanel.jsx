@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
-import {
-  getInstructorsRequest,
-  createInstructorRequest,
-} from "../../services/api";
+import {getInstructorsRequest,createInstructorRequest,updateInstructorRequest,deleteInstructorRequest,} from "../../services/api";
 
 export default function InstructorsPanel() {
   const [instructors, setInstructors] = useState([]);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingInstructor, setEditingInstructor] = useState(null);
 
   const [formData, setFormData] = useState({
     username: "",
@@ -38,8 +36,14 @@ export default function InstructorsPanel() {
     e.preventDefault();
 
     try {
-      await createInstructorRequest(formData);
+      if (editingInstructor) {
+        await updateInstructorRequest(editingInstructor, formData);
+      } else {
+        await createInstructorRequest(formData);
+      }
+
       setShowForm(false);
+      setEditingInstructor(null);
       fetchInstructors();
 
       setFormData({
@@ -54,11 +58,59 @@ export default function InstructorsPanel() {
     }
   };
 
+   const handleEdit = (instructor) => {
+       setEditingInstructor(instructor.instructor_id);
+       setShowForm(true);
+       setFormData({
+           username: instructor.username || "",
+           password: instructor.password || "",
+           specialty: instructor.specialty || "",
+           email: instructor.email || "",
+           phone: instructor.phone || "",
+           });
+};
+
+   const handleDelete = async (id) =>{
+    const confirmDelete = window.confirm("¿Seguro que quieres eliminar este instructor?");
+    if (!confirmDelete) return;
+
+    try {
+        await deleteInstructorRequest(id);
+        fetchInstructors();
+        } catch (err) {
+         alert(err.message);
+            }
+       };
+
+
+   const handleNewInstructor = () => {
+     setEditingInstructor(null);
+     setShowForm(true);
+
+     setFormData({
+       username: "",
+       password: "",
+       specialty: "",
+       email: "",
+       phone: "",
+     });
+   };
+
   return (
     <div>
       <div style={styles.headerRow}>
         <h2>Gestión de Instructores</h2>
-        <button onClick={() => setShowForm(!showForm)} style={styles.primaryBtn}>
+        <button
+          onClick={() => {
+            if (showForm) {
+              setShowForm(false);
+              setEditingInstructor(null);
+            } else {
+              handleNewInstructor();
+            }
+          }}
+          style={styles.primaryBtn}
+        >
           {showForm ? "Cancelar" : "+ Nuevo Instructor"}
         </button>
       </div>
@@ -67,7 +119,7 @@ export default function InstructorsPanel() {
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
-          <h3>Crear Nuevo Instructor</h3>
+          <h3>{editingInstructor ? "Editar Instructor" : "Crear Nuevo Instructor"}</h3>
           <div style={styles.grid}>
             <input
               name="username"
@@ -111,7 +163,7 @@ export default function InstructorsPanel() {
           </div>
 
           <button type="submit" style={{ ...styles.primaryBtn, marginTop: "1rem" }}>
-            Guardar Instructor
+            {editingInstructor ? "Actualizar Instructor" : "Guardar Instructor"}
           </button>
         </form>
       )}
@@ -124,6 +176,7 @@ export default function InstructorsPanel() {
             <th style={styles.th}>Especialidad</th>
             <th style={styles.th}>Email</th>
             <th style={styles.th}>Teléfono</th>
+            <th style={styles.th}>Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -134,6 +187,14 @@ export default function InstructorsPanel() {
               <td style={styles.td}>{instructor.specialty}</td>
               <td style={styles.td}>{instructor.email}</td>
               <td style={styles.td}>{instructor.phone}</td>
+              <td style={styles.td}>
+                <button onClick={() => handleEdit(instructor)} style={styles.editBtn}>
+                  Editar
+                </button>
+                <button onClick={() => handleDelete(instructor.instructor_id)} style={styles.deleteBtn}>
+                  Eliminar
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -191,4 +252,21 @@ const styles = {
     borderRadius: "4px",
     border: "1px solid #ccc",
   },
+
+    editBtn: {
+      background: "#2563eb",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "8px",
+      marginRight: "8px",
+    },
+
+    deleteBtn: {
+      background: "#ef4444",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "8px",
+    },
 };
