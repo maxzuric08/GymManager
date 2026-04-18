@@ -175,3 +175,135 @@ export async function createClassRequest(classData) {
 
   return data;
 }
+
+export async function updateUserRequest(id, userData) {
+  const response = await fetch(`${API_URL}/users/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(userData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al actualizar usuario");
+  }
+
+  return data;
+}
+
+export async function deleteUserRequest(id) {
+  const response = await fetch(`${API_URL}/users/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al eliminar usuario");
+  }
+
+  return data;
+}
+
+export async function updateInstructorRequest(id, instructorData) {
+  const response = await fetch(`${API_URL}/instructors/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(instructorData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al actualizar instructor");
+  }
+
+  return data;
+}
+
+export async function deleteInstructorRequest(id) {
+  const response = await fetch(`${API_URL}/instructors/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al eliminar instructor");
+  }
+
+  return data;
+}
+
+export async function updatePlanRequest(id, planData) {
+  const response = await fetch(`${API_URL}/plans/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(planData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al actualizar plan");
+  }
+
+  return data;
+}
+
+export async function deletePlanRequest(id) {
+  const response = await fetch(`${API_URL}/plans/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al eliminar plan");
+  }
+
+  return data;
+}
+
+export async function updateClassRequest(id, classData) {
+  const response = await fetch(`${API_URL}/classes/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(classData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al actualizar clase");
+  }
+
+  return data;
+}
+
+export async function deleteClassRequest(id) {
+  const response = await fetch(`${API_URL}/classes/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al eliminar clase");
+  }
+
+  return data;
+}
