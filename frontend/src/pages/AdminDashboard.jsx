@@ -1,131 +1,132 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { logoutRequest, getUsersRequest, createUserRequest } from "../services/api";
-
-import ClassesDashboard from "./ClassesDashboard";
+import AdminSidebar from "../components/admin/AdminSidebar";
+import AdminOverviewPanel from "../components/admin/AdminOverviewPanel";
+import UsersPanel from "../components/admin/UsersPanel";
+import InstructorsPanel from "../components/admin/InstructorsPanel";
+import PlansPanel from "../components/admin/PlansPanel";
+import ClassesPanel from "../components/admin/ClassesPanel";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [users, setUsers] = useState([]);
-  const [error, setError] = useState("");
-  
-  // Estados para el formulario
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    username: "", password: "", first_name: "", last_name: "",
-    dni: "", email: "", phone: "", birth_date: "", branch_id: 1, plan_id: 1
-  });
+  const [activeSection, setActiveSection] = useState("dashboard");
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-  const fetchUsers = async () => {
-    try {
-      const data = await getUsersRequest();
-      setUsers(data);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const handleLogout = async () => {
-    try { await logoutRequest(); } catch (error) { console.log(error); }
-    localStorage.clear();
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("role");
     navigate("/");
   };
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await createUserRequest(formData); // Mandamos los datos al backend
-      setShowForm(false); // Ocultamos el formulario
-      fetchUsers(); // Recargamos la tabla para ver al nuevo usuario
-      // Limpiamos el formulario
-      setFormData({ username: "", password: "", first_name: "", last_name: "", dni: "", email: "", phone: "", birth_date: "", branch_id: 1, plan_id: 1 });
-    } catch (err) {
-      alert(err.message);
+  const renderPanel = () => {
+    switch (activeSection) {
+      case "users":
+        return <UsersPanel />;
+      case "instructors":
+        return <InstructorsPanel />;
+      case "plans":
+        return <PlansPanel />;
+      case "classes":
+        return <ClassesPanel />;
+      default:
+        return <AdminOverviewPanel user={user} />;
     }
   };
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h1>Panel de Administración</h1>
-        <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar sesión</button>
-      </div>
+    <div style={styles.wrapper}>
+      <AdminSidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        handleLogout={handleLogout}
+      />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "2rem" }}>
-        <h2>Gestión de Usuarios</h2>
-        <button onClick={() => setShowForm(!showForm)} style={styles.primaryBtn}>
-          {showForm ? "Cancelar" : "+ Nuevo Usuario"}
-        </button>
-      </div>
-      
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
-      {/* Formulario de Alta */}
-      {showForm && (
-        <form onSubmit={handleSubmit} style={styles.formCard}>
-          <h3>Crear Nuevo Usuario</h3>
-          <div style={styles.grid}>
-            <input name="username" placeholder="Usuario" value={formData.username} onChange={handleInputChange} required style={styles.input} />
-            <input name="password" type="password" placeholder="Contraseña" value={formData.password} onChange={handleInputChange} required style={styles.input} />
-            <input name="first_name" placeholder="Nombre" value={formData.first_name} onChange={handleInputChange} style={styles.input} />
-            <input name="last_name" placeholder="Apellido" value={formData.last_name} onChange={handleInputChange} style={styles.input} />
-            <input name="dni" placeholder="DNI" value={formData.dni} onChange={handleInputChange} required style={styles.input} />
-            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} />
-            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={handleInputChange} style={styles.input} />
-            <input name="birth_date" type="date" value={formData.birth_date} onChange={handleInputChange} style={styles.input} />
+      <div style={styles.main}>
+        <header style={styles.topbar}>
+          <div>
+            <h1 style={styles.title}>¡Hola, {user?.first_name || user?.username || "Admin"}!</h1>
+            <p style={styles.subtitle}>Bienvenido al panel de administración de GymManager</p>
           </div>
-          <button type="submit" style={{...styles.primaryBtn, marginTop: "1rem"}}>Guardar Usuario</button>
-        </form>
-      )}
 
-      {/* Tabla de Usuarios */}
-      <table style={styles.table}>
-        <thead>
-          <tr>
-            <th style={styles.th}>ID</th><th style={styles.th}>Usuario</th><th style={styles.th}>Nombre</th>
-            <th style={styles.th}>Email</th><th style={styles.th}>DNI</th><th style={styles.th}>Estado</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.user_id} style={styles.tr}>
-              <td style={styles.td}>{user.user_id}</td>
-              <td style={styles.td}>{user.username}</td>
-              <td style={styles.td}>{user.first_name} {user.last_name}</td>
-              <td style={styles.td}>{user.email}</td>
-              <td style={styles.td}>{user.dni}</td>
-              <td style={styles.td}>
-                <span style={user.user_status === 'active' ? styles.active : styles.inactive}>{user.user_status}</span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <hr style={{ margin: "3rem 0", borderTop: "1px solid #eee" }} />
-      <ClassesDashboard />
-      
+          <div style={styles.topActions}>
+            <button style={styles.iconBtn}>🔔</button>
+            <button style={styles.iconBtn}>⚙️</button>
+            <div style={styles.avatar}>
+              {(user?.username || "A").charAt(0).toUpperCase()}
+            </div>
+          </div>
+        </header>
+
+        <section style={styles.content}>{renderPanel()}</section>
+      </div>
     </div>
   );
 }
 
 const styles = {
-  table: { width: "100%", borderCollapse: "collapse", marginTop: "1rem", backgroundColor: "white", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
-  th: { backgroundColor: "#0b5ed7", color: "white", padding: "12px", textAlign: "left" },
-  td: { padding: "12px", borderBottom: "1px solid #ddd" },
-  tr: { borderBottom: "1px solid #ddd" },
-  logoutBtn: { padding: "8px 16px", backgroundColor: "#dc3545", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" },
-  primaryBtn: { padding: "8px 16px", backgroundColor: "#198754", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" },
-  active: { backgroundColor: "#d1e7dd", color: "#0f5132", padding: "4px 8px", borderRadius: "12px", fontSize: "0.85rem" },
-  inactive: { backgroundColor: "#f8d7da", color: "#842029", padding: "4px 8px", borderRadius: "12px", fontSize: "0.85rem" },
-  formCard: { backgroundColor: "#f8f9fa", padding: "1.5rem", borderRadius: "8px", border: "1px solid #ddd", marginBottom: "1rem" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" },
-  input: { padding: "8px", borderRadius: "4px", border: "1px solid #ccc" }
+  wrapper: {
+    display: "flex",
+    minHeight: "100vh",
+    background:
+      "linear-gradient(135deg, #eef4ff 0%, #f6f8fc 45%, #eef7ff 100%)",
+    fontFamily: "Inter, Arial, sans-serif",
+  },
+  main: {
+    flex: 1,
+    padding: "24px 28px",
+  },
+  topbar: {
+    background: "rgba(255,255,255,0.75)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    border: "1px solid rgba(255,255,255,0.7)",
+    boxShadow: "0 10px 30px rgba(30, 41, 59, 0.08)",
+    borderRadius: "22px",
+    padding: "22px 24px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "24px",
+  },
+  title: {
+    margin: 0,
+    fontSize: "2rem",
+    fontWeight: 800,
+    color: "#132238",
+  },
+  subtitle: {
+    margin: "8px 0 0 0",
+    color: "#64748b",
+    fontSize: "0.98rem",
+  },
+  topActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  iconBtn: {
+    width: "42px",
+    height: "42px",
+    borderRadius: "50%",
+    border: "1px solid #dbe4f0",
+    background: "white",
+    cursor: "pointer",
+    fontSize: "1rem",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.04)",
+  },
+  avatar: {
+    width: "42px",
+    height: "42px",
+    borderRadius: "50%",
+    background: "linear-gradient(135deg, #2563eb, #14b8a6)",
+    color: "white",
+    display: "grid",
+    placeItems: "center",
+    fontWeight: 700,
+    boxShadow: "0 8px 20px rgba(37,99,235,0.25)",
+  },
+  content: {
+    marginTop: "8px",
+  },
 };
