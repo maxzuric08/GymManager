@@ -79,28 +79,41 @@ const deletePlan = async (req, res) => {
 
 
 
-const updateUserPlan =  async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { plan_id } = req.body;
+const updateUserPlan = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { plan_id } = req.body;
 
-        const result = await pool.query(
-            "UPDATE users SET plan_id = $1 WHERE user_id = $2 RETURNING *",
-            [plan_id, id]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Usuario no encontrado" });
-        }
-
-        res.json({
-            message: "Membresía asignada correctamente",
-            user: result.rows[0]
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error al asignar membresía" });
+    if (!plan_id) {
+      return res.status(400).json({ error: "Debes seleccionar un plan" });
     }
+
+    const planExists = await pool.query(
+      "SELECT * FROM plans WHERE plan_id = $1 AND status = 'active'",
+      [plan_id]
+    );
+
+    if (planExists.rows.length === 0) {
+      return res.status(404).json({ error: "Plan no encontrado o inactivo" });
+    }
+
+    const result = await pool.query(
+      "UPDATE users SET plan_id = $1 WHERE user_id = $2 RETURNING *",
+      [plan_id, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.json({
+      message: "Membresía asignada correctamente",
+      user: result.rows[0],
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al asignar membresía" });
+  }
 };
 
 module.exports = {

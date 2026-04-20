@@ -307,3 +307,19 @@ export async function deleteClassRequest(id) {
 
   return data;
 }
+
+export async function updateUserPlanRequest(userId, planId) {
+  const response = await fetch(`${API_URL}/plans/user/${userId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ plan_id: planId }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al asignar membresía");
+  }
+
+  return data;
+}
