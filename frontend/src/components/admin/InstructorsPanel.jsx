@@ -129,6 +129,7 @@ export default function InstructorsPanel() {
               required
               style={styles.input}
             />
+
             <input
               name="password"
               type="password"
@@ -138,26 +139,37 @@ export default function InstructorsPanel() {
               required
               style={styles.input}
             />
+
             <input
               name="specialty"
               placeholder="Especialidad"
               value={formData.specialty}
               onChange={handleInputChange}
               style={styles.input}
+              required
             />
+
             <input
               name="email"
               type="email"
-              placeholder="Email"
+              placeholder="Email (ej: profe@gmail.com)"
               value={formData.email}
               onChange={handleInputChange}
               style={styles.input}
+              required
+              pattern=".*@.*\.com$"
+              title="El email debe contener un @ y terminar obligatoriamente en .com"
             />
+
             <input
               name="phone"
               placeholder="Teléfono"
               value={formData.phone}
-              onChange={handleInputChange}
+              onChange={(e) => {
+                 // Reemplaza todo lo que NO sea número, espacio o guion
+                 const phoneValido = e.target.value.replace(/[^\d\s\-]/g, "");
+                 setFormData({ ...formData, phone: phoneValido });
+              }}
               style={styles.input}
             />
           </div>

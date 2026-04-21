@@ -30,6 +30,32 @@ const createUser =  async (req, res) => {
         if (!/^\d+$/.test(dni)) {
         return res.status(400).json({ error: "El DNI debe contener únicamente números" });
         }
+        
+        // Validar Nombre y Apellido (Solo letras y espacios)
+        if (first_name && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(first_name)) {
+            return res.status(400).json({ error: "El nombre solo puede contener letras." });
+        }
+        if (last_name && !/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(last_name)) {
+            return res.status(400).json({ error: "El apellido solo puede contener letras." });
+        }
+        
+        // Validar Teléfono (Solo números, guiones y espacios)
+        if (phone && !/^[\d\s\-]+$/.test(phone)) {
+            return res.status(400).json({ error: "El teléfono solo admite números, guiones y espacios." });
+        }
+        
+        // Validar Formato de Email (Exige @ y termina en .com)
+        if (!email || !/^[^\s@]+@[^\s@]+\.com$/.test(email)) {
+            return res.status(400).json({ error: "El email es obligatorio, debe contener un @ y terminar en .com" });
+        }
+        
+        // Validar que la fecha de nacimiento no sea en el futuro
+        if (birth_date) {
+            const today = new Date().toISOString().split("T")[0];
+            if (birth_date > today) {
+                return res.status(400).json({ error: "La fecha de nacimiento no puede ser en el futuro." });
+            }
+        }
 
         const result = await pool.query(
             `INSERT INTO users

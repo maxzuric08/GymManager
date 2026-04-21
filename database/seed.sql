@@ -60,3 +60,15 @@ VALUES (
            '1995-06-10'
        );
 
+-- =========================
+-- INSTRUCTOR
+-- =========================
+
+ALTER TABLE instructors
+ADD COLUMN first_name VARCHAR(50),
+ADD COLUMN last_name VARCHAR(50),
+ADD COLUMN dni VARCHAR(20) UNIQUE,
+ADD COLUMN birth_date DATE,
+ADD COLUMN branch_id INTEGER REFERENCES branches(branch_id),
+ADD COLUMN available_from TIME,
+ADD COLUMN available_to TIME;

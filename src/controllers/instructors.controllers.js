@@ -15,6 +15,16 @@ const getInstructors = async(req, res) => {
 const createInstructor = async (req, res) => {
     try {
         const { username, password, specialty, email, phone } = req.body;
+        
+        // Validar Teléfono (Solo números, guiones y espacios)
+        if (phone && !/^[\d\s\-]+$/.test(phone)) {
+            return res.status(400).json({ error: "El teléfono solo admite números, guiones y espacios." });
+        }
+
+        // Validar Formato de Email (Exige @ y termina en .com)
+        if (!email || !/^[^\s@]+@[^\s@]+\.com$/.test(email)) {
+            return res.status(400).json({ error: "El email es obligatorio, debe contener un @ y terminar en .com" });
+        }
 
         const result = await pool.query(
             `INSERT INTO instructors (username, password, specialty, email, phone)
@@ -34,6 +44,16 @@ const updateInstructor = async (req, res) => {
     try {
         const { id } = req.params;
         const { username, specialty, email, phone } = req.body;
+        
+        // Validar Teléfono (Solo números, guiones y espacios)
+        if (phone && !/^[\d\s\-]+$/.test(phone)) {
+            return res.status(400).json({ error: "El teléfono solo admite números, guiones y espacios." });
+        }
+
+        // Validar Formato de Email (Exige @ y termina en .com)
+        if (!email || !/^[^\s@]+@[^\s@]+\.com$/.test(email)) {
+            return res.status(400).json({ error: "El email es obligatorio, debe contener un @ y terminar en .com" });
+        }
 
         const result = await pool.query(
             `UPDATE instructors

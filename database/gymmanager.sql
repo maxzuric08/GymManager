@@ -47,7 +47,14 @@ CREATE TABLE IF NOT EXISTS instructors (
     password VARCHAR(255) NOT NULL,
     specialty VARCHAR(100),
     email VARCHAR(100),
-    phone VARCHAR(20)
+    phone VARCHAR(20),
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    dni VARCHAR(20) UNIQUE,
+    birth_date DATE,
+    branch_id INTEGER REFERENCES branches(branch_id),
+    available_from TIME,
+    available_to TIME
 );
 
 -- Clases
