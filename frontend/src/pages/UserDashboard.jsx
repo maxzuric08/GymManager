@@ -74,7 +74,7 @@ export default function UserDashboard() {
         </div>
 
         <button onClick={handleLogout} style={styles.logoutBtn}>
-          Cerrar sesión
+          Cerrar sesion
         </button>
       </div>
 

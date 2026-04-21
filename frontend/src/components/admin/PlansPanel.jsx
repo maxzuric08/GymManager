@@ -6,6 +6,8 @@ export default function PlansPanel() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
+  const [planToDelete, setPlanToDelete] = useState(null);
+
 
   const [formData, setFormData] = useState({
     plan_type: "",
@@ -75,18 +77,17 @@ export default function PlansPanel() {
         };
 
 
-    const handleDelete = async (id) => {
-          const confirmDelete = window.confirm("¿Seguro que quieres eliminar este plan?");
-          if (!confirmDelete) return;
+    const confirmDeletePlan = async () => {
+          if (!planToDelete) return;
 
           try {
-            await deletePlanRequest(id);
+            await deletePlanRequest(planToDelete.plan_id);
+            setPlanToDelete(null);
             fetchPlans();
           } catch (err) {
             alert(err.message);
           }
         };
-
     const handleNewPlan = () => {
           setEditingPlan(null);
           setShowForm(true);
@@ -207,14 +208,40 @@ export default function PlansPanel() {
                 <button onClick={() => handleEdit(plan)} style={styles.editBtn}>
                   Editar
                 </button>
-                <button onClick={() => handleDelete(plan.plan_id)} style={styles.deleteBtn}>
-                  Eliminar
+                <button onClick={() => setPlanToDelete(plan)} style={styles.deleteBtn}>
+                    Eliminar
                 </button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {planToDelete && (
+              <div style={styles.modalOverlay}>
+                <div style={styles.modal}>
+                  <h3 style={styles.modalTitle}>Eliminar plan</h3>
+                  <p style={styles.modalText}>
+                    ¿Seguro que quieres eliminar el plan <strong>{planToDelete.plan_type}</strong>?
+                  </p>
+
+                  <div style={styles.modalActions}>
+                    <button
+                      onClick={() => setPlanToDelete(null)}
+                      style={styles.cancelBtn}
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      onClick={confirmDeletePlan}
+                      style={styles.confirmDeleteBtn}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
     </div>
   );
 }
@@ -283,5 +310,61 @@ const styles = {
       border: "none",
       padding: "6px 10px",
       borderRadius: "8px",
+    },
+    modalOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0,0,0,0.45)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 999,
+    },
+
+    modal: {
+      backgroundColor: "white",
+      padding: "2rem",
+      borderRadius: "16px",
+      width: "420px",
+      maxWidth: "90%",
+      boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+    },
+
+    modalTitle: {
+      marginTop: 0,
+      marginBottom: "1rem",
+      fontSize: "1.4rem",
+    },
+
+    modalText: {
+      marginBottom: "1.5rem",
+      color: "#444",
+    },
+
+    modalActions: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: "10px",
+    },
+
+    cancelBtn: {
+      padding: "10px 16px",
+      border: "none",
+      borderRadius: "8px",
+      backgroundColor: "#94a3b8",
+      color: "white",
+      cursor: "pointer",
+    },
+
+    confirmDeleteBtn: {
+      padding: "10px 16px",
+      border: "none",
+      borderRadius: "8px",
+      backgroundColor: "#ef4444",
+      color: "white",
+      cursor: "pointer",
     },
 };

@@ -6,6 +6,8 @@ export default function UsersPanel() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
+
 
   const [formData, setFormData] = useState({
     username: "",
@@ -99,18 +101,6 @@ const handleSubmit = async (e) => {
       });
     };
 
-    const handleDelete = async (id) => {
-      const confirmDelete = window.confirm("¿Seguro que quieres eliminar este usuario?");
-      if (!confirmDelete) return;
-
-      try {
-        await deleteUserRequest(id);
-        fetchUsers();
-      } catch (err) {
-        alert(err.message);
-      }
-    };
-
     const handleNewUser = () => {
       setEditingUser(null);
       setShowForm(true);
@@ -128,6 +118,18 @@ const handleSubmit = async (e) => {
         plan_id: null,
         user_status: "active",
       });
+    };
+
+    const confirmDeleteUser = async () => {
+      if (!userToDelete) return;
+
+      try {
+        await deleteUserRequest(userToDelete.user_id);
+        setUserToDelete(null);
+        fetchUsers();
+      } catch (err) {
+        alert(err.message);
+      }
     };
 
   return (
@@ -289,7 +291,7 @@ const handleSubmit = async (e) => {
                  <button onClick={() => handleEdit(user)} style={styles.editBtn}>
                    Editar
                  </button>
-                 <button onClick={() => handleDelete(user.user_id)} style={styles.deleteBtn}>
+                 <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>
                    Eliminar
                  </button>
                </td>
@@ -297,6 +299,32 @@ const handleSubmit = async (e) => {
           ))}
         </tbody>
       </table>
+      {userToDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>Eliminar usuario</h3>
+            <p style={styles.modalText}>
+              ¿Seguro que quieres eliminar a <strong>{userToDelete.username}</strong>?
+            </p>
+
+            <div style={styles.modalActions}>
+              <button
+                onClick={() => setUserToDelete(null)}
+                style={styles.cancelBtn}
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={confirmDeleteUser}
+                style={styles.confirmDeleteBtn}
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -365,5 +393,62 @@ deleteBtn:{
   border:"none",
   padding:"6px 10px",
   borderRadius:"8px"
+},
+
+modalOverlay: {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  width: "100%",
+  height: "100%",
+  backgroundColor: "rgba(0,0,0,0.45)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 999,
+},
+
+modal: {
+  backgroundColor: "white",
+  padding: "2rem",
+  borderRadius: "16px",
+  width: "420px",
+  maxWidth: "90%",
+  boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+},
+
+modalTitle: {
+  marginTop: 0,
+  marginBottom: "1rem",
+  fontSize: "1.4rem",
+},
+
+modalText: {
+  marginBottom: "1.5rem",
+  color: "#444",
+},
+
+modalActions: {
+  display: "flex",
+  justifyContent: "flex-end",
+  gap: "10px",
+},
+
+cancelBtn: {
+  padding: "10px 16px",
+  border: "none",
+  borderRadius: "8px",
+  backgroundColor: "#94a3b8",
+  color: "white",
+  cursor: "pointer",
+},
+
+confirmDeleteBtn: {
+  padding: "10px 16px",
+  border: "none",
+  borderRadius: "8px",
+  backgroundColor: "#ef4444",
+  color: "white",
+  cursor: "pointer",
 },
 };

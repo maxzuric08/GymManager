@@ -61,6 +61,7 @@ export async function getUsersRequest() {
   return data;
 }
 
+
 export async function createUserRequest(userData) {
   const response = await fetch(`${API_URL}/users`, {
     method: "POST",
