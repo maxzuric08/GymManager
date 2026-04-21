@@ -180,7 +180,10 @@ const handleSubmit = async (e) => {
                name="first_name"
                placeholder="Nombre"
                value={formData.first_name}
-               onChange={handleInputChange}
+               onChange={(e) => {
+                const soloLetras = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "");
+                setFormData({ ...formData, first_name: soloLetras });
+               }}
                style={styles.input}
              />
 
@@ -188,39 +191,59 @@ const handleSubmit = async (e) => {
                name="last_name"
                placeholder="Apellido"
                value={formData.last_name}
-               onChange={handleInputChange}
+               onChange={(e) => {
+                 const soloLetras = e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "");
+                 setFormData({ ...formData, last_name: soloLetras });
+               }}
                style={styles.input}
              />
 
              <input
                name="dni"
-               placeholder="DNI"
+               type="text"
+               placeholder="DNI (solo números)"
                value={formData.dni}
-               onChange={handleInputChange}
+               onChange={(e) => {
+                const soloNumeros = e.target.value.replace(/\D/g, "");
+                setFormData({ ...formData, dni: soloNumeros });
+               }}
                style={styles.input}
                required
+               maxLength="10"
              />
 
              <input
                name="email"
                type="email"
-               placeholder="Email"
+               placeholder="Email (ej: usuario@gmail.com)"
                value={formData.email}
                onChange={handleInputChange}
                style={styles.input}
+               required
+               pattern=".*@.*\.com$"
+               title="El email debe contener un @ y terminar obligatoriamente en .com"
              />
 
              <input
                name="phone"
                placeholder="Teléfono"
                value={formData.phone}
-               onChange={handleInputChange}
+               onChange={(e) => {
+                 const phoneValido = e.target.value.replace(/[^\d\s\-]/g, "");
+                 setFormData({ ...formData, phone: phoneValido });
+               }}
                style={styles.input}
              />
 
-             <input
+               <input
                name="birth_date"
-               type="date"
+               type="text"
+               placeholder="Fecha de nacimiento"
+               onFocus={(e) => (e.target.type = "date")}
+               onBlur={(e) => {
+                 if (!e.target.value) e.target.type = "text";
+               }}
+               max={new Date().toISOString().split("T")[0]}
                value={formData.birth_date || ""}
                onChange={handleInputChange}
                style={styles.input}

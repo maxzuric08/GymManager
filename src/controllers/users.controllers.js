@@ -26,6 +26,11 @@ const createUser =  async (req, res) => {
             birth_date
         } = req.body;
 
+        // Validar que el DNI solo contenga números
+        if (!/^\d+$/.test(dni)) {
+        return res.status(400).json({ error: "El DNI debe contener únicamente números" });
+        }
+
         const result = await pool.query(
             `INSERT INTO users
             (branch_id, plan_id, username, password, dni, first_name, last_name, email, phone, birth_date)
@@ -56,6 +61,11 @@ const updateUser =  async (req, res) => {
             birth_date,
             user_status
         } = req.body;
+
+        // Validar que el DNI solo contenga números
+        if (!/^\d+$/.test(dni)) {
+            return res.status(400).json({ error: "El DNI debe contener únicamente números" });
+        }
 
         const result = await pool.query(
             `UPDATE users
