@@ -235,19 +235,17 @@ const handleSubmit = async (e) => {
                style={styles.input}
              />
 
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
+               <span style={{ fontSize: "0.7rem", color: "#94a3b8", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>Nacimiento:</span>
                <input
-               name="birth_date"
-               type="text"
-               placeholder="Fecha de nacimiento"
-               onFocus={(e) => (e.target.type = "date")}
-               onBlur={(e) => {
-                 if (!e.target.value) e.target.type = "text";
-               }}
-               max={new Date().toISOString().split("T")[0]}
-               value={formData.birth_date || ""}
-               onChange={handleInputChange}
-               style={styles.input}
-             />
+                 name="birth_date"
+                 type="date"
+                 max={new Date().toISOString().split("T")[0]}
+                 value={formData.birth_date || ""}
+                 onChange={handleInputChange}
+                 style={{ border: "none", outline: "none", width: "100%", padding: "10px 0", backgroundColor: "transparent", color: "#1e293b" }}
+               />
+            </div>
 
              <input
                name="branch_id"

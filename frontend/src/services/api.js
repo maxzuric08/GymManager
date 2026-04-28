@@ -323,3 +323,34 @@ export async function updateUserPlanRequest(userId, planId) {
 
   return data;
 }
+
+// --- RUTAS DE RESERVAS ---
+export async function getUserBookingsRequest(userId) {
+  const response = await fetch(`${API_URL}/bookings/user/${userId}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
+}
+
+export async function createBookingRequest(bookingData) {
+  const response = await fetch(`${API_URL}/bookings`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(bookingData),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
+}
+
+export async function cancelBookingRequest(bookingId) {
+  const response = await fetch(`${API_URL}/bookings/cancel/${bookingId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  return data;
+}

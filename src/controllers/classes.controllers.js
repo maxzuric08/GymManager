@@ -52,26 +52,39 @@ const getClasses =  async (req, res) => {
 const createClass = async (req, res) => {
     try {
         const {
-            instructor_id,
-            branch_id,
-            class_name,
-            capacity,
-            start_time,
-            end_time,
-            class_date,
-            status
+            instructor_id, branch_id, class_name, capacity, 
+            start_time, end_time, class_date, status
         } = req.body;
 
-        const validationError = validateClassDateTime(
-            class_date,
-            start_time,
-            end_time
-        );
-
+        // 1. Validación de fechas (que no sea en el pasado, etc.)
+        const validationError = validateClassDateTime(class_date, start_time, end_time);
         if (validationError) {
-            return res.status(400).json({
-                error: validationError
-            });
+            return res.status(400).json({ error: validationError });
+        }
+
+        // 2. 🛡️ CHEQUEO DE DISPONIBILIDAD DEL PROFESOR
+        if (instructor_id) {
+            const instructorQuery = await pool.query(
+                "SELECT available_from, available_to FROM instructors WHERE instructor_id = $1", 
+                [instructor_id]
+            );
+            
+            if (instructorQuery.rows.length > 0) {
+                const prof = instructorQuery.rows[0];
+                if (prof.available_from && prof.available_to) {
+                    // Normalizamos a formato HH:MM:SS para comparar bien
+                    const profStart = prof.available_from.length === 5 ? prof.available_from + ":00" : prof.available_from;
+                    const profEnd = prof.available_to.length === 5 ? prof.available_to + ":00" : prof.available_to;
+                    const classStart = start_time.length === 5 ? start_time + ":00" : start_time;
+                    const classEnd = end_time.length === 5 ? end_time + ":00" : end_time;
+
+                    if (classStart < profStart || classEnd > profEnd) {
+                        return res.status(400).json({ 
+                            error: `Turno bloqueado: El instructor solo tiene disponibilidad de ${profStart.slice(0,5)} a ${profEnd.slice(0,5)}.` 
+                        });
+                    }
+                }
+            }
         }
 
         const result = await pool.query(
@@ -79,93 +92,73 @@ const createClass = async (req, res) => {
             (instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, status)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
              RETURNING *`,
-            [
-                instructor_id,
-                branch_id,
-                class_name,
-                capacity,
-                start_time,
-                end_time,
-                class_date,
-                status || "scheduled"
-            ]
+            [instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, status || "scheduled"]
         );
 
         res.status(201).json(result.rows[0]);
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({
-            error: "Error al crear la clase"
-        });
+        res.status(500).json({ error: "Error al crear la clase" });
     }
 };
 
 const updateClass = async (req, res) => {
     try {
         const { id } = req.params;
-
         const {
-            instructor_id,
-            branch_id,
-            class_name,
-            capacity,
-            start_time,
-            end_time,
-            class_date,
-            status
+            instructor_id, branch_id, class_name, capacity, 
+            start_time, end_time, class_date, status
         } = req.body;
 
-        const validationError = validateClassDateTime(
-            class_date,
-            start_time,
-            end_time
-        );
-
+        // 1. Validación de fechas
+        const validationError = validateClassDateTime(class_date, start_time, end_time);
         if (validationError) {
-            return res.status(400).json({
-                error: validationError
-            });
+            return res.status(400).json({ error: validationError });
+        }
+
+        // 2. 🛡️ CHEQUEO DE DISPONIBILIDAD DEL PROFESOR
+        if (instructor_id) {
+            const instructorQuery = await pool.query(
+                "SELECT available_from, available_to FROM instructors WHERE instructor_id = $1", 
+                [instructor_id]
+            );
+            
+            if (instructorQuery.rows.length > 0) {
+                const prof = instructorQuery.rows[0];
+                if (prof.available_from && prof.available_to) {
+                    const profStart = prof.available_from.length === 5 ? prof.available_from + ":00" : prof.available_from;
+                    const profEnd = prof.available_to.length === 5 ? prof.available_to + ":00" : prof.available_to;
+                    const classStart = start_time.length === 5 ? start_time + ":00" : start_time;
+                    const classEnd = end_time.length === 5 ? end_time + ":00" : end_time;
+
+                    if (classStart < profStart || classEnd > profEnd) {
+                        return res.status(400).json({ 
+                            error: `Turno bloqueado: El instructor solo tiene disponibilidad de ${profStart.slice(0,5)} a ${profEnd.slice(0,5)}.` 
+                        });
+                    }
+                }
+            }
         }
 
         const result = await pool.query(
             `UPDATE classes
-             SET instructor_id = $1,
-                 branch_id = $2,
-                 class_name = $3,
-                 capacity = $4,
-                 start_time = $5,
-                 end_time = $6,
-                 class_date = $7,
-                 status = $8
+             SET instructor_id = $1, branch_id = $2, class_name = $3, capacity = $4, 
+                 start_time = $5, end_time = $6, class_date = $7, status = $8
              WHERE class_id = $9
              RETURNING *`,
-            [
-                instructor_id,
-                branch_id,
-                class_name,
-                capacity,
-                start_time,
-                end_time,
-                class_date,
-                status,
-                id
-            ]
+            [instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, status, id]
         );
 
         if (result.rows.length === 0) {
-            return res.status(404).json({
-                error: "Clase no encontrada"
-            });
+            return res.status(404).json({ error: "Clase no encontrada" });
         }
 
         res.json(result.rows[0]);
 
     } catch (error) {
         console.error(error);
-        res.status(500).json({
-            error: "Error al actualizar la clase"
-        });
+        res.status(500).json({ error: "Error al actualizar la clase" });
     }
 };
 
