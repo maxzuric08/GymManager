@@ -11,6 +11,7 @@ export default function InstructorsPanel() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingInstructor, setEditingInstructor] = useState(null);
+  const [instructorToDelete, setInstructorToDelete] = useState(null); // Estado para el Modal
 
   const [formData, setFormData] = useState({
     username: "", password: "", specialty: "", email: "", phone: "",
@@ -38,15 +39,13 @@ export default function InstructorsPanel() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validar que el Desde no sea mayor al Hasta
     if (formData.available_from && formData.available_to) {
       if (formData.available_from >= formData.available_to) {
         alert("La hora 'Disponible Hasta' debe ser estrictamente mayor a 'Disponible Desde'.");
-        return; // Corta la ejecución para que no se envíe al servidor
+        return; 
       }
     }
 
-    // Formatear branch_id a número o null
     const payload = {
       ...formData,
       branch_id: formData.branch_id ? Number(formData.branch_id) : null,
@@ -77,27 +76,20 @@ export default function InstructorsPanel() {
     setEditingInstructor(instructor.instructor_id);
     setShowForm(true);
     setFormData({
-      username: instructor.username || "",
-      password: instructor.password || "",
-      specialty: instructor.specialty || "",
-      email: instructor.email || "",
-      phone: instructor.phone || "",
-      first_name: instructor.first_name || "",
-      last_name: instructor.last_name || "",
-      dni: instructor.dni || "",
+      username: instructor.username || "", password: instructor.password || "", specialty: instructor.specialty || "",
+      email: instructor.email || "", phone: instructor.phone || "", first_name: instructor.first_name || "",
+      last_name: instructor.last_name || "", dni: instructor.dni || "",
       birth_date: instructor.birth_date ? instructor.birth_date.slice(0, 10) : "",
-      branch_id: instructor.branch_id || "",
-      available_from: instructor.available_from || "",
-      available_to: instructor.available_to || "",
+      branch_id: instructor.branch_id || "", available_from: instructor.available_from || "", available_to: instructor.available_to || "",
     });
   };
 
-  const handleDelete = async (id) => {
-    const confirmDelete = window.confirm("¿Seguro que quieres eliminar este instructor?");
-    if (!confirmDelete) return;
-
+  // Función del Modal
+  const confirmDeleteInstructor = async () => {
+    if (!instructorToDelete) return;
     try {
-      await deleteInstructorRequest(id);
+      await deleteInstructorRequest(instructorToDelete.instructor_id);
+      setInstructorToDelete(null);
       fetchInstructors();
     } catch (err) {
       alert(err.message);
@@ -109,8 +101,7 @@ export default function InstructorsPanel() {
     setShowForm(true);
     setFormData({
       username: "", password: "", specialty: "", email: "", phone: "",
-      first_name: "", last_name: "", dni: "", birth_date: "", branch_id: "",
-      available_from: "", available_to: ""
+      first_name: "", last_name: "", dni: "", birth_date: "", branch_id: "", available_from: "", available_to: ""
     });
   };
 
@@ -142,117 +133,77 @@ export default function InstructorsPanel() {
           <div style={styles.grid}>
             <input name="username" placeholder="Usuario" value={formData.username} onChange={handleInputChange} required style={styles.input} />
             <input name="password" type="password" placeholder="Contraseña" value={formData.password} onChange={handleInputChange} required style={styles.input} />
-            
-            <input
-               name="first_name" placeholder="Nombre (solo letras)" value={formData.first_name}
-               onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })}
-               style={styles.input}
-             />
-
-             <input
-               name="last_name" placeholder="Apellido (solo letras)" value={formData.last_name}
-               onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })}
-               style={styles.input}
-             />
-
-             <input
-               name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni}
-               onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })}
-               style={styles.input} required maxLength="10"
-             />
-
+            <input name="first_name" placeholder="Nombre (solo letras)" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
+            <input name="last_name" placeholder="Apellido (solo letras)" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
+            <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
             <input name="specialty" placeholder="Especialidad (Ej: Musculación)" value={formData.specialty} onChange={handleInputChange} style={styles.input} />
-            
-            <input
-              name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange}
-              style={styles.input} required pattern=".*@.*\.com$" title="El email debe contener un @ y terminar en .com"
-            />
-            
-            <input
-              name="phone" placeholder="Teléfono" value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s\-]/g, "") })}
-              style={styles.input}
-            />
+            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required pattern=".*@.*\.com$" title="El email debe contener un @ y terminar en .com" />
+            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s\-]/g, "") })} style={styles.input} />
 
-
-           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-               <span style={{ fontSize: "0.7rem", color: "#94a3b8", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>Nacimiento:</span>
-               <input
-                 name="birth_date"
-                 type="date"
-                 max={new Date().toISOString().split("T")[0]}
-                 value={formData.birth_date || ""}
-                 onChange={handleInputChange}
-                 style={{ border: "none", outline: "none", width: "100%", padding: "10px 0", backgroundColor: "transparent", color: "#1e293b" }}
-               />
+           <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
+               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Nacimiento</span>
+               <input name="birth_date" type="date" max={new Date().toISOString().split("T")[0]} value={formData.birth_date || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent", color: "#1e293b" }} />
             </div>
 
             <input name="branch_id" type="number" placeholder="ID Sucursal" value={formData.branch_id || ""} onChange={handleInputChange} style={styles.input} />
 
-            {/* Horarios de Disponibilidad */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-               <span style={{ fontSize: "0.7rem", color: "#94a3b8", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>Desde:</span>
-               <input
-                 name="available_from"
-                 type="time"
-                 value={formData.available_from || ""}
-                 onChange={handleInputChange}
-                 style={{ border: "none", outline: "none", width: "100%", padding: "10px 0", backgroundColor: "transparent" }}
-               />
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
+               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Desde</span>
+               <input name="available_from" type="time" value={formData.available_from || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-               <span style={{ fontSize: "0.7rem", color: "#94a3b8", whiteSpace: "nowrap", letterSpacing: "0.5px" }}>Hasta:</span>
-               <input
-                 name="available_to"
-                 type="time"
-                 value={formData.available_to || ""}
-                 onChange={handleInputChange}
-                 style={{ border: "none", outline: "none", width: "100%", padding: "10px 0", backgroundColor: "transparent" }}
-               />
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
+               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Hasta</span>
+               <input name="available_to" type="time" value={formData.available_to || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
             </div>
-
           </div>
 
-          <button type="submit" style={{ ...styles.primaryBtn, marginTop: "1rem", width: "100%" }}>
-            {editingInstructor ? "Actualizar Instructor" : "Guardar Instructor"}
-          </button>
+          <div style={{ marginTop: "1rem" }}>
+            <button type="submit" style={{ ...styles.primaryBtn, width: "100%", padding: "12px", fontSize: "13" }}>
+              {editingInstructor ? "Actualizar Instructor" : "Guardar Instructor"}
+            </button>
+          </div>
         </form>
       )}
 
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.th}>ID</th>
-            <th style={styles.th}>Nombre</th>
-            <th style={styles.th}>DNI</th>
-            <th style={styles.th}>Especialidad</th>
-            <th style={styles.th}>Horario</th>
-            <th style={styles.th}>Acciones</th>
+            <th style={styles.th}>ID</th><th style={styles.th}>Nombre</th><th style={styles.th}>DNI</th><th style={styles.th}>Especialidad</th><th style={styles.th}>Horario</th><th style={styles.th}>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {instructors.map((instructor) => (
             <tr key={instructor.instructor_id}>
               <td style={styles.td}>{instructor.instructor_id}</td>
-              <td style={styles.td}>
-                {instructor.first_name || instructor.username} {instructor.last_name}
-              </td>
+              <td style={styles.td}>{instructor.first_name || instructor.username} {instructor.last_name}</td>
               <td style={styles.td}>{instructor.dni || "-"}</td>
               <td style={styles.td}>{instructor.specialty}</td>
-              <td style={styles.td}>
-                {instructor.available_from && instructor.available_to 
-                  ? `${instructor.available_from.slice(0,5)} a ${instructor.available_to.slice(0,5)}` 
-                  : "No definido"}
-              </td>
+              <td style={styles.td}>{instructor.available_from && instructor.available_to ? `${instructor.available_from.slice(0,5)} a ${instructor.available_to.slice(0,5)}` : "No definido"}</td>
               <td style={styles.td}>
                 <button onClick={() => handleEdit(instructor)} style={styles.editBtn}>Editar</button>
-                <button onClick={() => handleDelete(instructor.instructor_id)} style={styles.deleteBtn}>Eliminar</button>
+                <button onClick={() => setInstructorToDelete(instructor)} style={styles.deleteBtn}>Eliminar</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {/* --- MODAL DE ELIMINAR --- */}
+      {instructorToDelete && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={styles.modalTitle}>Eliminar instructor</h3>
+            <p style={styles.modalText}>
+              ¿Seguro que quieres eliminar al instructor <strong>{instructorToDelete.username}</strong>?
+            </p>
+            <div style={styles.modalActions}>
+              <button onClick={() => setInstructorToDelete(null)} style={styles.cancelBtn}>Cancelar</button>
+              <button onClick={confirmDeleteInstructor} style={styles.confirmDeleteBtn}>Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -268,4 +219,11 @@ const styles = {
   input: { padding: "10px", borderRadius: "6px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
   editBtn: { background: "#2563eb", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   deleteBtn: { background: "#ef4444", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer" },
+  modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 999 },
+  modal: { backgroundColor: "white", padding: "2rem", borderRadius: "16px", width: "420px", maxWidth: "90%", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" },
+  modalTitle: { marginTop: 0, marginBottom: "1rem", fontSize: "1.4rem" },
+  modalText: { marginBottom: "1.5rem", color: "#444" },
+  modalActions: { display: "flex", justifyContent: "flex-end", gap: "10px" },
+  cancelBtn: { padding: "10px 16px", border: "none", borderRadius: "8px", backgroundColor: "#94a3b8", color: "white", cursor: "pointer" },
+  confirmDeleteBtn: { padding: "10px 16px", border: "none", borderRadius: "8px", backgroundColor: "#ef4444", color: "white", cursor: "pointer" }
 };

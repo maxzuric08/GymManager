@@ -13,6 +13,7 @@ export default function ClassesPanel() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
+  const [classToDelete, setClassToDelete] = useState(null);
 
   const [formData, setFormData] = useState({
     instructor_id: "",
@@ -87,19 +88,17 @@ export default function ClassesPanel() {
     });
   };
 
-  const handleDelete = async (id) => {
-    const confirmDelete = window.confirm(
-      "¿Seguro que quieres eliminar esta clase?"
-    );
-    if (!confirmDelete) return;
+  const confirmDeleteClass = async () => {
+            if (!classToDelete) return;
 
-    try {
-      await deleteClassRequest(id);
-      fetchClasses();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
+            try {
+              await deleteClassRequest(classToDelete.class_id);
+              setClassToDelete(null);
+              fetchClasses();
+            } catch (err) {
+              alert(err.message);
+            }
+          };
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -367,11 +366,8 @@ const handleSubmit = async (e) => {
                   >
                     Editar
                   </button>
-                  <button
-                    onClick={() => handleDelete(cls.class_id)}
-                    style={styles.deleteBtn}
-                  >
-                    Eliminar
+                  <button onClick={() => setClassToDelete(cls)} style={styles.deleteBtn}>
+                      Eliminar
                   </button>
                 </td>
               </tr>
@@ -379,6 +375,32 @@ const handleSubmit = async (e) => {
           )}
         </tbody>
       </table>
+      {classToDelete && (
+                    <div style={styles.modalOverlay}>
+                      <div style={styles.modal}>
+                        <h3 style={styles.modalTitle}>Eliminar clase</h3>
+                        <p style={styles.modalText}>
+                          ¿Seguro que quieres eliminar la clase de <strong>{classToDelete.class_name}</strong> del instructor <strong>{getInstructorName(classToDelete.instructor_id)}</strong>?
+                        </p>
+
+                        <div style={styles.modalActions}>
+                          <button
+                            onClick={() => setClassToDelete(null)}
+                            style={styles.cancelBtn}
+                          >
+                            Cancelar
+                          </button>
+
+                          <button
+                            onClick={confirmDeleteClass}
+                            style={styles.confirmDeleteBtn}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
     </div>
   );
 }
@@ -447,4 +469,60 @@ const styles = {
     padding: "6px 10px",
     borderRadius: "8px",
   },
+modalOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      width: "100%",
+      height: "100%",
+      backgroundColor: "rgba(0,0,0,0.45)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 999,
+    },
+
+    modal: {
+      backgroundColor: "white",
+      padding: "2rem",
+      borderRadius: "16px",
+      width: "420px",
+      maxWidth: "90%",
+      boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+    },
+
+    modalTitle: {
+      marginTop: 0,
+      marginBottom: "1rem",
+      fontSize: "1.4rem",
+    },
+
+    modalText: {
+      marginBottom: "1.5rem",
+      color: "#444",
+    },
+
+    modalActions: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: "10px",
+    },
+
+    cancelBtn: {
+      padding: "10px 16px",
+      border: "none",
+      borderRadius: "8px",
+      backgroundColor: "#94a3b8",
+      color: "white",
+      cursor: "pointer",
+    },
+
+    confirmDeleteBtn: {
+      padding: "10px 16px",
+      border: "none",
+      borderRadius: "8px",
+      backgroundColor: "#ef4444",
+      color: "white",
+      cursor: "pointer",
+    },
 };
