@@ -1,11 +1,13 @@
 const express = require("express");
 const router = express.Router();
 const planController = require("../controllers/plans.controllers");
+const verifyToken = require("../middleware/auth.middleware");
+const requireAdmin = require("../middleware/role.middleware");
 
-router.get("/", planController.getPlans);
-router.post("/", planController.createPlan);
-router.put("/:id", planController.updatePlan);
-router.delete("/:id",planController.deletePlan);
-router.put("/user/:id", planController.updateUserPlan);
+router.get("/", verifyToken, planController.getPlans);
+router.post("/", verifyToken, requireAdmin, planController.createPlan);
+router.put("/:id", verifyToken, requireAdmin,  planController.updatePlan);
+router.delete("/:id", verifyToken, requireAdmin, planController.deletePlan);
+router.put("/user/:id", verifyToken, planController.updateUserPlan);
 
 module.exports = router;
