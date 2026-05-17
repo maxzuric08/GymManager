@@ -6,6 +6,8 @@ import UsersPanel from "../components/admin/UsersPanel";
 import InstructorsPanel from "../components/admin/InstructorsPanel";
 import PlansPanel from "../components/admin/PlansPanel";
 import ClassesPanel from "../components/admin/ClassesPanel";
+import MedicalCertificatesPanel from "../components/admin/MedicalCertificatesPanel";
+
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -29,6 +31,8 @@ export default function AdminDashboard() {
         return <PlansPanel />;
       case "classes":
         return <ClassesPanel />;
+      case "medical-certificates":
+        return <MedicalCertificatesPanel />;
       default:
         return <AdminOverviewPanel user={user} />;
     }

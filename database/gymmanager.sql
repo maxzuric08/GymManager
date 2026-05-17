@@ -155,3 +155,19 @@ CREATE TABLE IF NOT EXISTS gym (
     system_plan VARCHAR(50),
     registration_date DATE
 );
+
+-- Certificados medicos
+
+CREATE TABLE IF NOT EXISTS medical_certificates (
+    medical_certificate_id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    mime_type VARCHAR(100) NOT NULL,
+    file_data BYTEA NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    rejection_reason TEXT,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reviewed_at TIMESTAMP,
+    reviewed_by INTEGER REFERENCES administrators(admin_id),
+    CHECK (status IN ('pending', 'approved', 'rejected'))
+    );

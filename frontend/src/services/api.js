@@ -355,3 +355,66 @@ export async function cancelBookingRequest(bookingId) {
   if (!response.ok) throw new Error(data.error);
   return data;
 }
+
+export async function getMyMedicalCertificateRequest() {
+  const response = await fetch(`${API_URL}/medical-certificates/me`, {
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener apto medico");
+  return data;
+}
+
+export async function uploadMedicalCertificateRequest(filePayload) {
+  const response = await fetch(`${API_URL}/medical-certificates/me`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(filePayload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al subir apto medico");
+  return data;
+}
+
+export async function getMedicalCertificatesRequest(status = "") {
+  const query = status ? `?status=${status}` : "";
+
+  const response = await fetch(`${API_URL}/medical-certificates${query}`, {
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener aptos medicos");
+  return data;
+}
+
+export async function reviewMedicalCertificateRequest(id, status, rejection_reason = "") {
+  const response = await fetch(`${API_URL}/medical-certificates/${id}/review`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ status, rejection_reason }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al revisar apto medico");
+  return data;
+}
+
+export async function openMedicalCertificateFile(id) {
+  const response = await fetch(`${API_URL}/medical-certificates/${id}/file`, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.error || "Error al abrir archivo");
+  }
+
+  const blob = await response.blob();
+  const fileUrl = URL.createObjectURL(blob);
+  window.open(fileUrl, "_blank");
+}

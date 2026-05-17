@@ -1,9 +1,20 @@
-const requireAdmin = (req, res, next) => {
-    if (req.user.role !== "admin") {
-        return res.status(403).json({ error: "Acceso solo para administradores" });
-    }
+const requireRole = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({ error: "No tenes permisos para acceder a este recurso" });
+        }
 
-    next();
+        next();
+    };
 };
 
-module.exports = requireAdmin;
+const requireAdmin = requireRole("admin");
+const requireUser = requireRole("user");
+const requireInstructor = requireRole("instructor");
+
+module.exports = {
+    requireRole,
+    requireAdmin,
+    requireUser,
+    requireInstructor
+};

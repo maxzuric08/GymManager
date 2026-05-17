@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/users.controllers");
 const verifyToken = require("../middleware/auth.middleware");
-const requireAdmin = require("../middleware/role.middleware");
+const { requireAdmin } = require("../middleware/role.middleware");
 
 router.get("/", verifyToken, requireAdmin, userController.getUsers);
 router.post("/", verifyToken, requireAdmin, userController.createUser);

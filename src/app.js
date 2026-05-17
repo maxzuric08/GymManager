@@ -13,6 +13,7 @@ app.use("/plans", require("./routes/plans.routes"));
 app.use("/instructors", require("./routes/instructors.routes"));
 app.use("/classes", require("./routes/classes.routes"));
 app.use("/bookings", require("./routes/bookings.routes"));
+app.use("/medical-certificates", require("./routes/medicalCertificates.routes"));
 
 
 

@@ -24,6 +24,7 @@ const login = async (req, res) => {
         }
 
         const user = result.rows[0];
+        delete user.password;
 
         const token = jwt.sign(
             {
