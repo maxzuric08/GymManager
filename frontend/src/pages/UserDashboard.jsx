@@ -31,6 +31,9 @@ export default function UserDashboard() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+
   const fetchMedicalCertificate = async () => {
     try {
       const data = await getMyMedicalCertificateRequest();
@@ -42,27 +45,41 @@ export default function UserDashboard() {
 
   const fetchData = async () => {
     try {
-      const [plansData, classesData, bookingsData, certificateData] =
+      const [plansData, classesData, bookingsData] =
           await Promise.all([
             getPlansRequest(),
             getClassesRequest(),
             getUserBookingsRequest(),
-            getMyMedicalCertificateRequest(),
           ]);
 
-      setPlans(plansData.filter((p) => p.status === "active"));
+      console.log("Plans data from API:", plansData);
+      const filteredPlans = plansData.filter((p) => p.status === "active");
+      console.log("Filtered plans:", filteredPlans);
+      setPlans(filteredPlans);
 
       const today = new Date().toISOString().split("T")[0];
-      setClasses(
-          classesData.filter(
-              (c) => c.class_date >= today && c.status !== "cancelled"
-          )
+      const filteredClasses = classesData.filter(
+          (c) => c.class_date >= today && c.status !== "cancelled"
       );
+      console.log("Filtered classes:", filteredClasses);
+      setClasses(filteredClasses);
+
+      console.log("Bookings data:", bookingsData);
 
       setMyBookings(bookingsData);
-      setMedicalCertificate(certificateData);
       setError("");
+
+      // Fetch medical certificate separately so it doesn't break other data
+      try {
+        const certificateData = await getMyMedicalCertificateRequest();
+        console.log("Medical certificate data:", certificateData);
+        setMedicalCertificate(certificateData);
+      } catch (certErr) {
+        console.error("Error fetching medical certificate:", certErr);
+        setMedicalCertificate(null);
+      }
     } catch (err) {
+      console.error("Error in fetchData:", err);
       setError("Error al cargar los datos del sistema.");
     }
   };
@@ -103,21 +120,23 @@ export default function UserDashboard() {
   };
 
   const handleBookClass = async (classId) => {
+    clearMessages();
+
     if (!currentUser.plan_id) {
-      setError("Debes adquirir una membresia antes de reservar clases.");
+      setError("Debes adquirir una membresía antes de reservar clases.");
       setActiveTab("membership");
       return;
     }
 
     if (!medicalCertificate || medicalCertificate.status !== "approved") {
-      setError("Necesitas tener el apto medico aprobado para reservar clases.");
+      setError("Necesitas tener el apto médico aprobado para reservar clases.");
       setActiveTab("medical-certificate");
       return;
     }
 
     try {
       await createBookingRequest({ class_id: classId });
-      setMessage("Reserva confirmada con exito.");
+      setMessage("Reserva confirmada con éxito.");
       setError("");
       fetchData();
     } catch (err) {
@@ -126,17 +145,30 @@ export default function UserDashboard() {
     }
   };
 
-  const handleCancelBooking = async (bookingId) => {
-    if (!window.confirm("Seguro que queres cancelar esta reserva?")) return;
+  const handleCancelBooking = (bookingId) => {
+    setConfirmModal({
+      title: "Cancelar Reserva",
+      message: "¿Seguro que quieres cancelar esta reserva?"
+    });
+    setConfirmAction(() => async () => {
+      try {
+        await cancelBookingRequest(bookingId);
+        setMessage("Reserva cancelada.");
+        setError("");
+        setConfirmModal(null);
+        fetchData();
+      } catch (err) {
+        setError(err.message);
+      }
+    });
+  };
 
-    try {
-      await cancelBookingRequest(bookingId);
-      setMessage("Reserva cancelada.");
-      setError("");
-      fetchData();
-    } catch (err) {
-      setError(err.message);
+  const handleConfirmAction = async () => {
+    if (confirmAction) {
+      await confirmAction();
     }
+    setConfirmModal(null);
+    setConfirmAction(null);
   };
 
   const handleUploadMedicalCertificate = async (e) => {
@@ -269,7 +301,7 @@ export default function UserDashboard() {
                             {booking.start_time.slice(0, 5)} a{" "}
                             {booking.end_time.slice(0, 5)}
                           </p>
-                          <p>Prof. {booking.first_name || "Asignado"}</p>
+                          <p>Prof. {booking.instructor_first_name && booking.instructor_last_name ? `${booking.instructor_first_name} ${booking.instructor_last_name}` : (booking.instructor_first_name || booking.instructor_last_name || "Asignado")}</p>
 
                           <button
                               onClick={() => handleCancelBooking(booking.booking_id)}
@@ -446,6 +478,32 @@ export default function UserDashboard() {
               </form>
             </div>
         )}
+
+        {confirmModal && (
+            <div style={styles.modalOverlay}>
+              <div style={styles.modal}>
+                <h3 style={{ marginTop: 0, color: "#132238" }}>{confirmModal.title}</h3>
+                <p style={{ color: "#475569", marginBottom: "1.5rem" }}>{confirmModal.message}</p>
+                <div style={styles.modalActions}>
+                  <button
+                      onClick={() => {
+                        setConfirmModal(null);
+                        setConfirmAction(null);
+                      }}
+                      style={styles.modalCancelBtn}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                      onClick={handleConfirmAction}
+                      style={styles.modalConfirmBtn}
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+        )}
       </div>
   );
 }
@@ -573,5 +631,43 @@ const styles = {
     background: "#fee2e2",
     borderRadius: "8px",
     marginBottom: "1rem",
+  },
+  modalOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.45)",
+    display: "grid",
+    placeItems: "center",
+    zIndex: 999,
+  },
+  modal: {
+    width: "420px",
+    background: "white",
+    padding: "1.5rem",
+    borderRadius: "14px",
+    boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
+  },
+  modalActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "10px",
+  },
+  modalCancelBtn: {
+    padding: "10px 16px",
+    border: "1px solid #cbd5e1",
+    borderRadius: "8px",
+    background: "white",
+    color: "#475569",
+    cursor: "pointer",
+    fontWeight: "bold",
+  },
+  modalConfirmBtn: {
+    padding: "10px 16px",
+    border: "none",
+    borderRadius: "8px",
+    background: "#dc3545",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
   },
 };

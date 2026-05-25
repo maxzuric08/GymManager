@@ -13,6 +13,8 @@ export default function PlansPanel() {
     plan_type: "",
     cost: "",
     duration: "",
+    duration_value: "",
+    duration_unit: "months",
     benefits: "",
     class_limit: "",
     status: "active",
@@ -53,6 +55,8 @@ export default function PlansPanel() {
           plan_type: "",
           cost: "",
           duration: "",
+          duration_value: "",
+          duration_unit: "months",
           benefits: "",
           class_limit: "",
           status: "active",
@@ -70,6 +74,8 @@ export default function PlansPanel() {
             plan_type: plan.plan_type || "",
             cost: plan.cost || "",
             duration: plan.duration || "",
+            duration_value: plan.duration_value || "",
+            duration_unit: plan.duration_unit || "months",
             benefits: plan.benefits || "",
             class_limit: plan.class_limit || "",
             status: plan.status || "active",
@@ -96,6 +102,8 @@ export default function PlansPanel() {
             plan_type: "",
             cost: "",
             duration: "",
+            duration_value: "",
+            duration_unit: "months",
             benefits: "",
             class_limit: "",
             status: "active",
@@ -145,12 +153,24 @@ export default function PlansPanel() {
               style={styles.input}
             />
             <input
-              name="duration"
+              name="duration_value"
+              type="number"
               placeholder="Duración"
-              value={formData.duration}
+              value={formData.duration_value}
               onChange={handleInputChange}
+              min="1"
               style={styles.input}
             />
+            <select
+              name="duration_unit"
+              value={formData.duration_unit}
+              onChange={handleInputChange}
+              style={styles.input}
+            >
+              <option value="days">Días</option>
+              <option value="months">Meses</option>
+              <option value="weeks">Semanas</option>
+            </select>
             <input
               name="class_limit"
               type="number"
@@ -200,8 +220,14 @@ export default function PlansPanel() {
             <tr key={plan.plan_id}>
               <td style={styles.td}>{plan.plan_id}</td>
               <td style={styles.td}>{plan.plan_type}</td>
-              <td style={styles.td}>{plan.cost}</td>
-              <td style={styles.td}>{plan.duration}</td>
+              <td style={styles.td}>${plan.cost}</td>
+              <td style={styles.td}>
+                {plan.duration_value} {
+                  plan.duration_unit === 'days' ? 'Día(s)' :
+                  plan.duration_unit === 'weeks' ? 'Semana(s)' :
+                  'Mes(es)'
+                }
+              </td>
               <td style={styles.td}>{plan.class_limit}</td>
               <td style={styles.td}>{plan.status}</td>
               <td style={styles.td}>

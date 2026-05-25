@@ -10,6 +10,10 @@ const sanitizeBase64 = (value = "") => {
 
 const getMyMedicalCertificate = async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Usuario no autenticado" });
+        }
+
         const result = await pool.query(
             `SELECT medical_certificate_id,
                     user_id,
@@ -29,13 +33,17 @@ const getMyMedicalCertificate = async (req, res) => {
 
         res.json(result.rows[0] || null);
     } catch (error) {
-        console.error(error);
+        console.error("Error en getMyMedicalCertificate:", error);
         res.status(500).json({ error: "Error al obtener el apto medico" });
     }
 };
 
 const uploadMedicalCertificate = async (req, res) => {
     try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Usuario no autenticado" });
+        }
+
         const { file_name, mime_type, file_data } = req.body;
 
         if (!file_name || !mime_type || !file_data) {
@@ -56,7 +64,9 @@ const uploadMedicalCertificate = async (req, res) => {
         }
 
         if (fileBuffer.length > MAX_FILE_SIZE) {
-            return res.status(400).json({ error: "El archivo no puede superar 5 MB" });
+            return res.status(400).json({
+                error: `El archivo no puede superar 5 MB (tamaño actual: ${(fileBuffer.length / 1024 / 1024).toFixed(2)} MB)`
+            });
         }
 
         const result = await pool.query(
@@ -80,7 +90,7 @@ const uploadMedicalCertificate = async (req, res) => {
             certificate: result.rows[0]
         });
     } catch (error) {
-        console.error(error);
+        console.error("Error en uploadMedicalCertificate:", error);
         res.status(500).json({ error: "Error al subir el apto medico" });
     }
 };

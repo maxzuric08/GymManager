@@ -1,14 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { logoutRequest, getClassesRequest } from "../services/api";
+import { logoutRequest, getClassesRequest, getClassStudentsRequest } from "../services/api";
 
 export default function InstructorDashboard() {
   const navigate = useNavigate();
   // Leemos quién es el profe logueado (y ahora trae su first_name, available_from, etc.)
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  
+
   const [myClasses, setMyClasses] = useState([]);
   const [error, setError] = useState("");
+  const [expandedClassId, setExpandedClassId] = useState(null);
+  const [classStudents, setClassStudents] = useState({});
 
   useEffect(() => {
     const fetchMyAgenda = async () => {
@@ -36,6 +38,22 @@ export default function InstructorDashboard() {
     try { await logoutRequest(); } catch (error) { console.log(error); }
     localStorage.clear();
     navigate("/");
+  };
+
+  const toggleClassStudents = async (classId) => {
+    if (expandedClassId === classId) {
+      setExpandedClassId(null);
+    } else {
+      setExpandedClassId(classId);
+      if (!classStudents[classId]) {
+        try {
+          const students = await getClassStudentsRequest(classId);
+          setClassStudents({ ...classStudents, [classId]: students });
+        } catch (err) {
+          console.error("Error al cargar estudiantes:", err);
+        }
+      }
+    }
   };
 
   const formatDate = (dateString) => {
@@ -79,7 +97,9 @@ export default function InstructorDashboard() {
             myClasses.map((cls) => (
               <div key={cls.class_id} style={{...styles.classCard, borderLeft: cls.status === "cancelled" ? "4px solid #dc3545" : "4px solid #0b5ed7"}}>
                 <div style={styles.cardHeader}>
-                  <h3 style={{ margin: 0, color: "#132238" }}>{cls.class_name}</h3>
+                  <div onClick={() => toggleClassStudents(cls.class_id)} style={{ cursor: "pointer", flex: 1 }}>
+                    <h3 style={{ margin: 0, color: "#132238" }}>{cls.class_name} {expandedClassId === cls.class_id ? "▼" : "▶"}</h3>
+                  </div>
                   <span style={cls.status === "cancelled" ? styles.badgeCancelled : styles.badgeActive}>
                     {cls.status}
                   </span>
@@ -89,6 +109,34 @@ export default function InstructorDashboard() {
                   <p><strong>⏰ Horario:</strong> {cls.start_time.slice(0,5)} a {cls.end_time.slice(0,5)}</p>
                   <p><strong>👥 Cupos Totales:</strong> {cls.capacity} alumnos</p>
                 </div>
+
+                {expandedClassId === cls.class_id && (
+                  <div style={styles.studentsList}>
+                    <h4 style={{ marginTop: 0, color: "#132238" }}>Alumnos Anotados ({classStudents[cls.class_id]?.length || 0})</h4>
+                    {classStudents[cls.class_id]?.length > 0 ? (
+                      <table style={styles.studentsTable}>
+                        <thead>
+                          <tr>
+                            <th style={styles.th}>Alumno</th>
+                            <th style={styles.th}>DNI</th>
+                            <th style={styles.th}>Username</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classStudents[cls.class_id].map((student) => (
+                            <tr key={student.user_id}>
+                              <td style={styles.td}>{student.first_name} {student.last_name}</td>
+                              <td style={styles.td}>{student.dni || "-"}</td>
+                              <td style={styles.td}>{student.username}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p style={{ color: "#64748b" }}>Sin alumnos anotados aún</p>
+                    )}
+                  </div>
+                )}
               </div>
             ))
           )}
@@ -112,5 +160,9 @@ const styles = {
   cardBody: { lineHeight: "1.8", color: "#334155", margin: 0 },
   badgeActive: { backgroundColor: "#dbeafe", color: "#1d4ed8", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold" },
   badgeCancelled: { backgroundColor: "#fee2e2", color: "#b91c1c", padding: "4px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold" },
-  emptyState: { padding: "3rem", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", gridColumn: "1 / -1" }
+  emptyState: { padding: "3rem", textAlign: "center", color: "#64748b", backgroundColor: "#f8fafc", borderRadius: "12px", gridColumn: "1 / -1" },
+  studentsList: { marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "2px solid #eef2f7" },
+  studentsTable: { width: "100%", borderCollapse: "collapse", fontSize: "0.9rem" },
+  th: { backgroundColor: "#e0e7ff", color: "#1e293b", padding: "10px", textAlign: "left", fontWeight: "bold", borderBottom: "2px solid #c7d2fe" },
+  td: { padding: "10px", borderBottom: "1px solid #eef2f7", color: "#334155" }
 };

@@ -326,8 +326,8 @@ export async function updateUserPlanRequest(userId, planId) {
 }
 
 // --- RUTAS DE RESERVAS ---
-export async function getUserBookingsRequest(userId) {
-  const response = await fetch(`${API_URL}/bookings/user/${userId}`, {
+export async function getUserBookingsRequest() {
+  const response = await fetch(`${API_URL}/bookings/my-bookings`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -347,7 +347,7 @@ export async function createBookingRequest(bookingData) {
 }
 
 export async function cancelBookingRequest(bookingId) {
-  const response = await fetch(`${API_URL}/bookings/cancel/${bookingId}`, {
+  const response = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -417,4 +417,13 @@ export async function openMedicalCertificateFile(id) {
   const blob = await response.blob();
   const fileUrl = URL.createObjectURL(blob);
   window.open(fileUrl, "_blank");
+}
+
+export async function getClassStudentsRequest(classId) {
+  const response = await fetch(`${API_URL}/bookings/class/${classId}/students`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener estudiantes");
+  return data;
 }
