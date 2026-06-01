@@ -99,15 +99,88 @@ const deleteInstructor = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "DELETE FROM instructors WHERE instructor_id = $1 RETURNING *",
+            "UPDATE instructors SET status = 'inactive' WHERE instructor_id = $1 RETURNING *",
             [id]
         );
 
         if (result.rows.length === 0) return res.status(404).json({ error: "Instructor no encontrado" });
-        res.json({ message: "Instructor eliminado", instructor: result.rows[0] });
+        res.json({ message: "Instructor desactivado", instructor: result.rows[0] });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error al eliminar instructor" });
+        res.status(500).json({ error: "Error al desactivar instructor" });
+    }
+};
+
+const deactivateMyAccount = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Usuario no autenticado" });
+        }
+
+        const result = await pool.query(
+            "UPDATE instructors SET status = 'inactive' WHERE instructor_id = $1 RETURNING instructor_id, username, email, status",
+            [req.user.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Instructor no encontrado" });
+        }
+
+        res.json({
+            message: "Tu cuenta ha sido desactivada correctamente",
+            instructor: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al desactivar tu cuenta" });
+    }
+};
+
+const reactivateMyAccount = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Usuario no autenticado" });
+        }
+
+        const result = await pool.query(
+            "UPDATE instructors SET status = 'active' WHERE instructor_id = $1 RETURNING instructor_id, username, email, status",
+            [req.user.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Instructor no encontrado" });
+        }
+
+        res.json({
+            message: "Tu cuenta ha sido reactivada correctamente",
+            instructor: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al reactivar tu cuenta" });
+    }
+};
+
+const reactivateInstructor = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE instructors SET status = 'active' WHERE instructor_id = $1 RETURNING *",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Instructor no encontrado" });
+        }
+
+        res.json({
+            message: "Instructor reactivado correctamente",
+            instructor: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al reactivar instructor" });
     }
 };
 
@@ -115,5 +188,8 @@ module.exports = {
     getInstructors,
     createInstructor,
     updateInstructor,
-    deleteInstructor
+    deleteInstructor,
+    deactivateMyAccount,
+    reactivateMyAccount,
+    reactivateInstructor
 };

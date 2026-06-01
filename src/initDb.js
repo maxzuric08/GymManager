@@ -48,6 +48,13 @@ const initializeDatabase = async () => {
     `);
     console.log("✓ duration_value and duration_unit columns added to plans");
 
+    // Add status column to instructors table
+    await pool.query(`
+      ALTER TABLE instructors
+      ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+    `);
+    console.log("✓ status column added to instructors");
+
     // Create index for better query performance
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_medical_certificates_user_id

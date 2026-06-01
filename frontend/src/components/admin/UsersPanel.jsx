@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import Modal from "../Modal";
 import {
   getUsersRequest,
   createUserRequest,
   updateUserRequest,
   deleteUserRequest,
+  reactivateUserRequest,
+  removeMembershipRequest,
 } from "../../services/api";
 
 export default function UsersPanel() {
@@ -11,7 +14,8 @@ export default function UsersPanel() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [userToDelete, setUserToDelete] = useState(null); // Estado para el Modal
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
 
   const [formData, setFormData] = useState({
     username: "", password: "", dni: "", first_name: "", last_name: "",
@@ -61,7 +65,13 @@ export default function UsersPanel() {
         email: "", phone: "", birth_date: "", branch_id: "", plan_id: "", user_status: "active",
       });
     } catch (err) {
-      alert(err.message);
+      setModal({
+        isOpen: true,
+        title: "Error",
+        message: err.message,
+        type: "error",
+        onConfirm: () => setModal({ ...modal, isOpen: false })
+      });
     }
   };
 
@@ -100,6 +110,47 @@ export default function UsersPanel() {
     });
   };
 
+  const handleReactivateUser = async (userId) => {
+    try {
+      await reactivateUserRequest(userId);
+      fetchUsers();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleRemoveMembership = (userId) => {
+    setModal({
+      isOpen: true,
+      title: "Remover membresía",
+      message: "¿Estás seguro de que quieres remover la membresía de este usuario?",
+      type: "warning",
+      onConfirm: async () => {
+        try {
+          await removeMembershipRequest(userId);
+          setModal({
+            isOpen: true,
+            title: "Éxito",
+            message: "Membresía removida correctamente",
+            type: "success",
+            onConfirm: () => {
+              setModal({ ...modal, isOpen: false });
+              fetchUsers();
+            }
+          });
+        } catch (err) {
+          setModal({
+            isOpen: true,
+            title: "Error",
+            message: err.message,
+            type: "error",
+            onConfirm: () => setModal({ ...modal, isOpen: false })
+          });
+        }
+      }
+    });
+  };
+
   return (
     <div>
       <div style={styles.headerRow}>
@@ -131,7 +182,7 @@ export default function UsersPanel() {
             <input name="first_name" placeholder="Nombre" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="last_name" placeholder="Apellido" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
-            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required pattern=".*@.*\.com$" title="El email debe contener un @ y terminar obligatoriamente en .com" />
+            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar obligatoriamente en .com" />
             <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s\-]/g, "") })} style={styles.input} />
 
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "4px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
@@ -168,7 +219,16 @@ export default function UsersPanel() {
               <td style={styles.td}>{user.user_id}</td><td style={styles.td}>{user.username}</td><td style={styles.td}>{user.first_name} {user.last_name}</td><td style={styles.td}>{user.email}</td><td style={styles.td}>{user.dni}</td><td style={styles.td}>{user.user_status}</td>
               <td style={styles.td}>
                 <button onClick={() => handleEdit(user)} style={styles.editBtn}>Editar</button>
-                <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>Eliminar</button>
+                {user.user_status === 'inactive' ? (
+                  <button onClick={() => handleReactivateUser(user.user_id)} style={styles.reactivateBtn}>Reactivar</button>
+                ) : (
+                  <>
+                    {user.plan_id && (
+                      <button onClick={() => handleRemoveMembership(user.user_id)} style={styles.warningBtn}>Sin plan</button>
+                    )}
+                    <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>Eliminar</button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
@@ -190,6 +250,18 @@ export default function UsersPanel() {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={() => {
+          modal.onConfirm?.();
+        }}
+        onCancel={() => setModal({ ...modal, isOpen: false })}
+        confirmText={modal.type === "warning" ? "Confirmar" : "Aceptar"}
+      />
     </div>
   );
 }
@@ -204,6 +276,8 @@ const styles = {
   grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" },
   input: { padding: "10px", borderRadius: "4px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
   editBtn: { background: "#2563eb", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
+  reactivateBtn: { background: "#22c55e", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
+  warningBtn: { background: "#f59e0b", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   deleteBtn: { background: "#ef4444", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer" },
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 999 },
   modal: { backgroundColor: "white", padding: "2rem", borderRadius: "16px", width: "420px", maxWidth: "90%", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" },

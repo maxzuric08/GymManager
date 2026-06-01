@@ -126,7 +126,7 @@ const deleteUser = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(
-            "DELETE FROM users WHERE user_id = $1 RETURNING *",
+            "UPDATE users SET user_status = 'inactive' WHERE user_id = $1 RETURNING *",
             [id]
         );
 
@@ -134,10 +134,83 @@ const deleteUser = async (req, res) => {
             return res.status(404).json({ error: "Usuario no encontrado" });
         }
 
-        res.json({ message: "Usuario eliminado", user: result.rows[0] });
+        res.json({ message: "Usuario desactivado", user: result.rows[0] });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Error al eliminar usuario" });
+        res.status(500).json({ error: "Error al desactivar usuario" });
+    }
+};
+
+const deactivateMyAccount = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Usuario no autenticado" });
+        }
+
+        const result = await pool.query(
+            "UPDATE users SET user_status = 'inactive' WHERE user_id = $1 RETURNING user_id, username, email, user_status",
+            [req.user.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Usuario no encontrado" });
+        }
+
+        res.json({
+            message: "Tu cuenta ha sido desactivada correctamente",
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al desactivar tu cuenta" });
+    }
+};
+
+const reactivateMyAccount = async (req, res) => {
+    try {
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Usuario no autenticado" });
+        }
+
+        const result = await pool.query(
+            "UPDATE users SET user_status = 'active' WHERE user_id = $1 RETURNING user_id, username, email, user_status",
+            [req.user.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Usuario no encontrado" });
+        }
+
+        res.json({
+            message: "Tu cuenta ha sido reactivada correctamente",
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al reactivar tu cuenta" });
+    }
+};
+
+const reactivateUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            "UPDATE users SET user_status = 'active' WHERE user_id = $1 RETURNING *",
+            [id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Usuario no encontrado" });
+        }
+
+        res.json({
+            message: "Usuario reactivado correctamente",
+            user: result.rows[0]
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al reactivar usuario" });
     }
 };
 
@@ -145,5 +218,8 @@ module.exports = {
     getUsers,
     createUser,
     updateUser,
-    deleteUser
+    deleteUser,
+    deactivateMyAccount,
+    reactivateMyAccount,
+    reactivateUser
 };

@@ -24,6 +24,16 @@ const login = async (req, res) => {
         }
 
         const user = result.rows[0];
+
+        // Verificar que el usuario no esté inactivo
+        if (role === "user" && user.user_status === "inactive") {
+            return res.status(403).json({ error: "Tu cuenta ha sido desactivada. Contacta al administrador." });
+        }
+
+        if (role === "instructor" && user.status === "inactive") {
+            return res.status(403).json({ error: "Tu cuenta ha sido desactivada. Contacta al administrador." });
+        }
+
         delete user.password;
 
         const token = jwt.sign(

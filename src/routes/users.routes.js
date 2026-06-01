@@ -6,6 +6,9 @@ const { requireAdmin } = require("../middleware/role.middleware");
 
 router.get("/", verifyToken, requireAdmin, userController.getUsers);
 router.post("/", verifyToken, requireAdmin, userController.createUser);
+router.post("/deactivate/me", verifyToken, userController.deactivateMyAccount);
+router.post("/reactivate/me", verifyToken, userController.reactivateMyAccount);
+router.put("/:id/reactivate", verifyToken, requireAdmin, userController.reactivateUser);
 router.put("/:id", verifyToken, requireAdmin, userController.updateUser);
 router.delete("/:id", verifyToken, requireAdmin, userController.deleteUser);
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { getPlansRequest, createPlanRequest, updatePlanRequest, deletePlanRequest } from "../../services/api";
+import Modal from "../Modal";
+import { getPlansRequest, createPlanRequest, updatePlanRequest, deletePlanRequest, deactivatePlanRequest, reactivatePlanRequest } from "../../services/api";
 
 export default function PlansPanel() {
   const [plans, setPlans] = useState([]);
@@ -7,6 +8,7 @@ export default function PlansPanel() {
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [planToDelete, setPlanToDelete] = useState(null);
+  const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
 
 
   const [formData, setFormData] = useState({
@@ -62,7 +64,13 @@ export default function PlansPanel() {
           status: "active",
         });
       } catch (err) {
-        alert(err.message);
+        setModal({
+          isOpen: true,
+          title: "Error",
+          message: err.message,
+          type: "error",
+          onConfirm: () => setModal({ ...modal, isOpen: false })
+        });
       }
     };
 
@@ -91,7 +99,61 @@ export default function PlansPanel() {
             setPlanToDelete(null);
             fetchPlans();
           } catch (err) {
-            alert(err.message);
+            setModal({
+              isOpen: true,
+              title: "Error",
+              message: err.message,
+              type: "error",
+              onConfirm: () => setModal({ ...modal, isOpen: false })
+            });
+          }
+        };
+
+    const handleDeactivatePlan = async (planId) => {
+          try {
+            const result = await deactivatePlanRequest(planId);
+            setModal({
+              isOpen: true,
+              title: "Plan desactivado",
+              message: `${result.activeUsersCount} usuarios aún usan este plan y pueden seguir hasta que venza.`,
+              type: "success",
+              onConfirm: () => {
+                setModal({ ...modal, isOpen: false });
+                fetchPlans();
+              }
+            });
+          } catch (err) {
+            setModal({
+              isOpen: true,
+              title: "Error",
+              message: err.message,
+              type: "error",
+              onConfirm: () => setModal({ ...modal, isOpen: false })
+            });
+          }
+        };
+
+    const handleReactivatePlan = async (planId) => {
+          try {
+            await reactivatePlanRequest(planId);
+            setModal({
+              isOpen: true,
+              title: "Plan reactivado",
+              message: "El plan ahora está activo nuevamente.",
+              type: "success",
+              onConfirm: () => {
+                setModal({ ...modal, isOpen: false });
+                fetchPlans();
+              }
+            });
+          } catch (err) {
+            setModal({
+              isOpen: true,
+              title: "Error",
+              message: err.message,
+              type: "error",
+              onConfirm: () => setModal({ ...modal, isOpen: false })
+            });
           }
         };
     const handleNewPlan = () => {
@@ -234,9 +296,20 @@ export default function PlansPanel() {
                 <button onClick={() => handleEdit(plan)} style={styles.editBtn}>
                   Editar
                 </button>
-                <button onClick={() => setPlanToDelete(plan)} style={styles.deleteBtn}>
-                    Eliminar
-                </button>
+                {plan.status === 'active' ? (
+                  <button onClick={() => handleDeactivatePlan(plan.plan_id)} style={styles.deactivateBtn}>
+                    Desactivar
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={() => handleReactivatePlan(plan.plan_id)} style={styles.reactivateBtn}>
+                      Reactivar
+                    </button>
+                    <button onClick={() => setPlanToDelete(plan)} style={styles.deleteBtn}>
+                      Eliminar
+                    </button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
@@ -268,6 +341,18 @@ export default function PlansPanel() {
                 </div>
               </div>
             )}
+
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={() => {
+          modal.onConfirm?.();
+        }}
+        onCancel={() => setModal({ ...modal, isOpen: false })}
+        confirmText={modal.type === "warning" ? "Confirmar" : "Aceptar"}
+      />
     </div>
   );
 }
@@ -328,6 +413,27 @@ const styles = {
       padding: "6px 10px",
       borderRadius: "8px",
       marginRight: "8px",
+      cursor: "pointer",
+    },
+
+    deactivateBtn: {
+      background: "#f59e0b",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "8px",
+      marginRight: "8px",
+      cursor: "pointer",
+    },
+
+    reactivateBtn: {
+      background: "#22c55e",
+      color: "white",
+      border: "none",
+      padding: "6px 10px",
+      borderRadius: "8px",
+      marginRight: "8px",
+      cursor: "pointer",
     },
 
     deleteBtn: {
@@ -336,6 +442,7 @@ const styles = {
       border: "none",
       padding: "6px 10px",
       borderRadius: "8px",
+      cursor: "pointer",
     },
     modalOverlay: {
       position: "fixed",

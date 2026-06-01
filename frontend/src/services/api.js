@@ -427,3 +427,78 @@ export async function getClassStudentsRequest(classId) {
   if (!response.ok) throw new Error(data.error || "Error al obtener estudiantes");
   return data;
 }
+
+export async function reactivateUserRequest(id) {
+  const response = await fetch(`${API_URL}/users/${id}/reactivate`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al reactivar usuario");
+  }
+
+  return data;
+}
+
+export async function reactivateInstructorRequest(id) {
+  const response = await fetch(`${API_URL}/instructors/${id}/reactivate`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al reactivar instructor");
+  }
+
+  return data;
+}
+
+export async function deactivatePlanRequest(id) {
+  const response = await fetch(`${API_URL}/plans/${id}/deactivate`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al desactivar plan");
+  }
+
+  return data;
+}
+
+export async function reactivatePlanRequest(id) {
+  const response = await fetch(`${API_URL}/plans/${id}/reactivate`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al reactivar plan");
+  }
+
+  return data;
+}
+
+export async function removeMembershipRequest(userId) {
+  const response = await fetch(`${API_URL}/plans/user/${userId}/remove-membership`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al remover membresía");
+  }
+
+  return data;
+}

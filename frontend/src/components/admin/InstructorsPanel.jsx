@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import Modal from "../Modal";
 import {
   getInstructorsRequest,
   createInstructorRequest,
   updateInstructorRequest,
   deleteInstructorRequest,
+  reactivateInstructorRequest,
 } from "../../services/api";
 
 export default function InstructorsPanel() {
@@ -11,7 +13,8 @@ export default function InstructorsPanel() {
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingInstructor, setEditingInstructor] = useState(null);
-  const [instructorToDelete, setInstructorToDelete] = useState(null); // Estado para el Modal
+  const [instructorToDelete, setInstructorToDelete] = useState(null);
+  const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
 
   const [formData, setFormData] = useState({
     username: "", password: "", specialty: "", email: "", phone: "",
@@ -68,7 +71,13 @@ export default function InstructorsPanel() {
         available_from: "", available_to: ""
       });
     } catch (err) {
-      alert(err.message);
+      setModal({
+        isOpen: true,
+        title: "Error",
+        message: err.message,
+        type: "error",
+        onConfirm: () => setModal({ ...modal, isOpen: false })
+      });
     }
   };
 
@@ -92,7 +101,13 @@ export default function InstructorsPanel() {
       setInstructorToDelete(null);
       fetchInstructors();
     } catch (err) {
-      alert(err.message);
+      setModal({
+        isOpen: true,
+        title: "Error",
+        message: err.message,
+        type: "error",
+        onConfirm: () => setModal({ ...modal, isOpen: false })
+      });
     }
   };
 
@@ -103,6 +118,15 @@ export default function InstructorsPanel() {
       username: "", password: "", specialty: "", email: "", phone: "",
       first_name: "", last_name: "", dni: "", birth_date: "", branch_id: "", available_from: "", available_to: ""
     });
+  };
+
+  const handleReactivateInstructor = async (instructorId) => {
+    try {
+      await reactivateInstructorRequest(instructorId);
+      fetchInstructors();
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -137,7 +161,7 @@ export default function InstructorsPanel() {
             <input name="last_name" placeholder="Apellido (solo letras)" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
             <input name="specialty" placeholder="Especialidad (Ej: Musculación)" value={formData.specialty} onChange={handleInputChange} style={styles.input} />
-            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required pattern=".*@.*\.com$" title="El email debe contener un @ y terminar en .com" />
+            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar en .com" />
             <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s\-]/g, "") })} style={styles.input} />
 
            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
@@ -182,7 +206,11 @@ export default function InstructorsPanel() {
               <td style={styles.td}>{instructor.available_from && instructor.available_to ? `${instructor.available_from.slice(0,5)} a ${instructor.available_to.slice(0,5)}` : "No definido"}</td>
               <td style={styles.td}>
                 <button onClick={() => handleEdit(instructor)} style={styles.editBtn}>Editar</button>
-                <button onClick={() => setInstructorToDelete(instructor)} style={styles.deleteBtn}>Eliminar</button>
+                {instructor.status === 'inactive' ? (
+                  <button onClick={() => handleReactivateInstructor(instructor.instructor_id)} style={styles.reactivateBtn}>Reactivar</button>
+                ) : (
+                  <button onClick={() => setInstructorToDelete(instructor)} style={styles.deleteBtn}>Eliminar</button>
+                )}
               </td>
             </tr>
           ))}
@@ -204,6 +232,18 @@ export default function InstructorsPanel() {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={modal.isOpen}
+        title={modal.title}
+        message={modal.message}
+        type={modal.type}
+        onConfirm={() => {
+          modal.onConfirm?.();
+        }}
+        onCancel={() => setModal({ ...modal, isOpen: false })}
+        confirmText={modal.type === "warning" ? "Confirmar" : "Aceptar"}
+      />
     </div>
   );
 }
@@ -218,6 +258,7 @@ const styles = {
   grid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" },
   input: { padding: "10px", borderRadius: "6px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
   editBtn: { background: "#2563eb", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
+  reactivateBtn: { background: "#22c55e", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   deleteBtn: { background: "#ef4444", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer" },
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 999 },
   modal: { backgroundColor: "white", padding: "2rem", borderRadius: "16px", width: "420px", maxWidth: "90%", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" },
