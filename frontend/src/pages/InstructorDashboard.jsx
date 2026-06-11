@@ -26,7 +26,7 @@ export default function InstructorDashboard() {
         filteredClasses.sort((a, b) => new Date(a.class_date) - new Date(b.class_date));
         
         setMyClasses(filteredClasses);
-      } catch (err) {
+      } catch {
         setError("Error al cargar la agenda. Verifica tu conexión.");
       }
     };

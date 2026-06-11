@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
     getMedicalCertificatesRequest,
     reviewMedicalCertificateRequest,
@@ -13,7 +13,7 @@ export default function MedicalCertificatesPanel() {
     const [rejectingId, setRejectingId] = useState(null);
     const [rejectionReason, setRejectionReason] = useState("");
 
-    const fetchCertificates = async () => {
+    const fetchCertificates = useCallback(async () => {
         try {
             const data = await getMedicalCertificatesRequest(statusFilter);
             setCertificates(data);
@@ -21,11 +21,11 @@ export default function MedicalCertificatesPanel() {
         } catch (err) {
             setError(err.message);
         }
-    };
+    }, [statusFilter]);
 
     useEffect(() => {
         fetchCertificates();
-    }, [statusFilter]);
+    }, [fetchCertificates]);
 
     const handleApprove = async (id) => {
         try {

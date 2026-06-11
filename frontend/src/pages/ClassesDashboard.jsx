@@ -40,7 +40,7 @@ export default function ClassesDashboard() {
       setShowForm(false);
       fetchClasses(); // Recargamos la tabla
       setFormData({ instructor_id: 1, branch_id: 1, class_name: "", capacity: 20, start_time: "", end_time: "", class_date: "" });
-    } catch (err) {
+    } catch {
       alert("Error al crear: Probablemente el ID del profesor no exista en la base de datos.");
     }
   };

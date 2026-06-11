@@ -6,7 +6,7 @@ const { requireAdmin } = require("../middleware/role.middleware");
 
 router.get("/",verifyToken, classController.getClasses);
 router.post("/",verifyToken, requireAdmin,classController.createClass);
-router.put("/:id", verifyToken, classController.updateClass);
+router.put("/:id", verifyToken, requireAdmin, classController.updateClass);
 router.delete("/:id", verifyToken, requireAdmin, classController.deleteClass);
 
 module.exports = router;

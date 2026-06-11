@@ -80,7 +80,7 @@ export default function UsersPanel() {
     setShowForm(true);
 
     setFormData({
-      username: user.username || "", password: user.password || "",
+      username: user.username || "", password: "",
       first_name: user.first_name || "", last_name: user.last_name || "",
       dni: user.dni || "", email: user.email || "", phone: user.phone || "",
       birth_date: user.birth_date ? user.birth_date.slice(0, 10) : "",
@@ -178,12 +178,12 @@ export default function UsersPanel() {
 
           <div style={styles.grid}>
             <input name="username" placeholder="Usuario" value={formData.username} onChange={handleInputChange} style={styles.input} required />
-            <input name="password" type="password" placeholder="Contraseña" value={formData.password} onChange={handleInputChange} style={styles.input} required />
+            <input name="password" type="password" placeholder={editingUser ? "Nueva contraseña (opcional)" : "Contraseña"} value={formData.password} onChange={handleInputChange} style={styles.input} required={!editingUser} />
             <input name="first_name" placeholder="Nombre" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="last_name" placeholder="Apellido" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
             <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar obligatoriamente en .com" />
-            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s\-]/g, "") })} style={styles.input} />
+            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s-]/g, "") })} style={styles.input} />
 
             <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "4px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Nacimiento</span>

@@ -7,6 +7,7 @@ import InstructorsPanel from "../components/admin/InstructorsPanel";
 import PlansPanel from "../components/admin/PlansPanel";
 import ClassesPanel from "../components/admin/ClassesPanel";
 import MedicalCertificatesPanel from "../components/admin/MedicalCertificatesPanel";
+import AttendancePanel from "../components/admin/AttendancePanel";
 
 
 export default function AdminDashboard() {
@@ -33,6 +34,8 @@ export default function AdminDashboard() {
         return <ClassesPanel />;
       case "medical-certificates":
         return <MedicalCertificatesPanel />;
+      case "attendance":
+        return <AttendancePanel />;
       default:
         return <AdminOverviewPanel user={user} />;
     }

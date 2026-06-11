@@ -2,7 +2,23 @@ const pool = require("../db");
 
 const getInstructors = async(req, res) => {
     try {
-        const result = await pool.query("SELECT * FROM instructors ORDER BY instructor_id ASC");
+        const result = await pool.query(`
+            SELECT instructor_id,
+                   username,
+                   specialty,
+                   email,
+                   phone,
+                   first_name,
+                   last_name,
+                   dni,
+                   birth_date,
+                   branch_id,
+                   available_from,
+                   available_to,
+                   status
+            FROM instructors
+            ORDER BY instructor_id ASC
+        `);
         res.json(result.rows);
     } catch (error) {
         console.error(error);
@@ -13,7 +29,7 @@ const getInstructors = async(req, res) => {
 const createInstructor = async (req, res) => {
     try {
         const { 
-            username, password, specialty, email, phone, 
+            username, password, specialty, email, phone,
             first_name, last_name, dni, birth_date, branch_id, 
             available_from, available_to 
         } = req.body;
@@ -34,9 +50,21 @@ const createInstructor = async (req, res) => {
             `INSERT INTO instructors 
             (username, password, specialty, email, phone, first_name, last_name, dni, birth_date, branch_id, available_from, available_to)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-             RETURNING *`,
+             RETURNING instructor_id,
+                       username,
+                       specialty,
+                       email,
+                       phone,
+                       first_name,
+                       last_name,
+                       dni,
+                       birth_date,
+                       branch_id,
+                       available_from,
+                       available_to,
+                       status`,
             [
-                username, password, specialty, email, phone, 
+                username, password, specialty, email, phone,
                 first_name, last_name, dni || null, 
                 birth_date || null, branch_id || null, 
                 available_from || null, available_to || null
@@ -56,7 +84,7 @@ const updateInstructor = async (req, res) => {
     try {
         const { id } = req.params;
         const { 
-            username, specialty, email, phone, 
+            username, password, specialty, email, phone,
             first_name, last_name, dni, birth_date, branch_id, 
             available_from, available_to 
         } = req.body;
@@ -70,16 +98,29 @@ const updateInstructor = async (req, res) => {
 
         const result = await pool.query(
             `UPDATE instructors
-             SET username = $1, specialty = $2, email = $3, phone = $4, 
-                 first_name = $5, last_name = $6, dni = $7, birth_date = $8, 
-                 branch_id = $9, available_from = $10, available_to = $11
-             WHERE instructor_id = $12
-             RETURNING *`,
+             SET username = $1, password = COALESCE(NULLIF($2, ''), password),
+                 specialty = $3, email = $4, phone = $5,
+                 first_name = $6, last_name = $7, dni = $8, birth_date = $9,
+                 branch_id = $10, available_from = $11, available_to = $12
+             WHERE instructor_id = $13
+             RETURNING instructor_id,
+                       username,
+                       specialty,
+                       email,
+                       phone,
+                       first_name,
+                       last_name,
+                       dni,
+                       birth_date,
+                       branch_id,
+                       available_from,
+                       available_to,
+                       status`,
             [
-                username, specialty, email, phone, 
-                first_name, last_name, dni || null, 
-                birth_date || null, branch_id || null, 
-                available_from || null, available_to || null, 
+                username, password || null, specialty, email, phone,
+                first_name, last_name, dni || null,
+                birth_date || null, branch_id || null,
+                available_from || null, available_to || null,
                 id
             ]
         );
@@ -99,7 +140,7 @@ const deleteInstructor = async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            "UPDATE instructors SET status = 'inactive' WHERE instructor_id = $1 RETURNING *",
+            "UPDATE instructors SET status = 'inactive' WHERE instructor_id = $1 RETURNING instructor_id, username, email, status",
             [id]
         );
 
@@ -166,7 +207,7 @@ const reactivateInstructor = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(
-            "UPDATE instructors SET status = 'active' WHERE instructor_id = $1 RETURNING *",
+            "UPDATE instructors SET status = 'active' WHERE instructor_id = $1 RETURNING instructor_id, username, email, status",
             [id]
         );
 

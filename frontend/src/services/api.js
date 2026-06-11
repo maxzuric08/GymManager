@@ -502,3 +502,42 @@ export async function removeMembershipRequest(userId) {
 
   return data;
 }
+
+export async function getAttendanceOverviewRequest(dateFrom, dateTo) {
+  const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+  const response = await fetch(`${API_URL}/attendance/statistics/overview?${params}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener estadisticas de asistencia");
+  return data;
+}
+
+export async function getClassAttendanceRequest(classId) {
+  const response = await fetch(`${API_URL}/attendance/classes/${classId}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener asistencia de la clase");
+  return data;
+}
+
+export async function saveClassAttendanceRequest(classId, attendances) {
+  const response = await fetch(`${API_URL}/attendance/classes/${classId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ attendances }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al guardar asistencia");
+  return data;
+}
+
+export async function getClassAttendanceStatisticsRequest(classId) {
+  const response = await fetch(`${API_URL}/attendance/classes/${classId}/statistics`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener estadisticas de la clase");
+  return data;
+}

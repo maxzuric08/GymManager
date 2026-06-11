@@ -3,7 +3,23 @@ const pool = require("../db");
 
 const getUsers = async (req, res) => {
     try {
-        const result = await pool.query("SELECT * FROM users ORDER BY user_id ASC");
+        const result = await pool.query(`
+            SELECT user_id,
+                   branch_id,
+                   plan_id,
+                   username,
+                   dni,
+                   first_name,
+                   last_name,
+                   email,
+                   phone,
+                   user_status,
+                   birth_date,
+                   registration_date,
+                   plan_expiration_date
+            FROM users
+            ORDER BY user_id ASC
+        `);
         res.json(result.rows);
     } catch (error) {
         console.error(error);
@@ -61,7 +77,19 @@ const createUser =  async (req, res) => {
             `INSERT INTO users
             (branch_id, plan_id, username, password, dni, first_name, last_name, email, phone, birth_date)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-            RETURNING *`,
+            RETURNING user_id,
+                      branch_id,
+                      plan_id,
+                      username,
+                      dni,
+                      first_name,
+                      last_name,
+                      email,
+                      phone,
+                      user_status,
+                      birth_date,
+                      registration_date,
+                      plan_expiration_date`,
             [branch_id, plan_id, username, password, dni, first_name, last_name, email, phone, birth_date]
         );
 
@@ -79,6 +107,7 @@ const updateUser =  async (req, res) => {
             branch_id,
             plan_id,
             username,
+            password,
             dni,
             first_name,
             last_name,
@@ -98,16 +127,29 @@ const updateUser =  async (req, res) => {
              SET branch_id = $1,
                  plan_id = $2,
                  username = $3,
-                 dni = $4,
-                 first_name = $5,
-                 last_name = $6,
-                 email = $7,
-                 phone = $8,
-                 birth_date = $9,
-                 user_status = $10
-             WHERE user_id = $11
-             RETURNING *`,
-            [branch_id, plan_id, username, dni, first_name, last_name, email, phone, birth_date, user_status, id]
+                 password = COALESCE(NULLIF($4, ''), password),
+                 dni = $5,
+                 first_name = $6,
+                 last_name = $7,
+                 email = $8,
+                 phone = $9,
+                 birth_date = $10,
+                 user_status = $11
+             WHERE user_id = $12
+             RETURNING user_id,
+                      branch_id,
+                      plan_id,
+                      username,
+                      dni,
+                      first_name,
+                      last_name,
+                      email,
+                      phone,
+                      user_status,
+                      birth_date,
+                      registration_date,
+                      plan_expiration_date`,
+            [branch_id, plan_id, username, password || null, dni, first_name, last_name, email, phone, birth_date, user_status, id]
         );
 
         if (result.rows.length === 0) {
@@ -126,7 +168,7 @@ const deleteUser = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(
-            "UPDATE users SET user_status = 'inactive' WHERE user_id = $1 RETURNING *",
+            "UPDATE users SET user_status = 'inactive' WHERE user_id = $1 RETURNING user_id, username, email, user_status",
             [id]
         );
 
@@ -196,7 +238,7 @@ const reactivateUser = async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(
-            "UPDATE users SET user_status = 'active' WHERE user_id = $1 RETURNING *",
+            "UPDATE users SET user_status = 'active' WHERE user_id = $1 RETURNING user_id, username, email, user_status",
             [id]
         );
 

@@ -10,6 +10,7 @@ export default function AdminSidebar({
     { key: "plans", label: "Planes", icon: "💳" },
     { key: "classes", label: "Clases", icon: "📅" },
     { key: "medical-certificates", label: "Aptos Medicos", icon: "📄" },
+    { key: "attendance", label: "Asistencias", icon: "✓" },
   ];
 
   return (

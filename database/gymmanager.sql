@@ -6,7 +6,9 @@ CREATE TABLE IF NOT EXISTS plans (
     duration VARCHAR(50),
     benefits TEXT,
     class_limit INTEGER,
-    status VARCHAR(20) DEFAULT 'active'
+    status VARCHAR(20) DEFAULT 'active',
+    duration_value INTEGER DEFAULT 1,
+    duration_unit VARCHAR(20) DEFAULT 'months'
 );
 
 -- Sedes
@@ -37,7 +39,8 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(20),
     user_status VARCHAR(20) DEFAULT 'active',
     birth_date DATE,
-    registration_date DATE DEFAULT CURRENT_DATE
+    registration_date DATE DEFAULT CURRENT_DATE,
+    plan_expiration_date DATE
 );
 
 -- Profesor
@@ -54,7 +57,8 @@ CREATE TABLE IF NOT EXISTS instructors (
     birth_date DATE,
     branch_id INTEGER REFERENCES branches(branch_id),
     available_from TIME,
-    available_to TIME
+    available_to TIME,
+    status VARCHAR(20) DEFAULT 'active'
 );
 
 -- Clases
@@ -86,7 +90,11 @@ CREATE TABLE IF NOT EXISTS attendance (
     booking_id INTEGER REFERENCES bookings(booking_id),
     class_id INTEGER REFERENCES classes(class_id),
     check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(20) DEFAULT 'present'
+    status VARCHAR(20) DEFAULT 'present',
+    marked_by_admin INTEGER,
+    notes TEXT,
+    CONSTRAINT attendance_status_check CHECK (status IN ('present', 'absent', 'late', 'excused')),
+    CONSTRAINT attendance_booking_unique UNIQUE (booking_id)
 );
 
 -- Permisos
@@ -107,6 +115,17 @@ CREATE TABLE IF NOT EXISTS administrators (
     email VARCHAR(100),
     phone VARCHAR(20)
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'attendance_marked_by_admin_fkey'
+    ) THEN
+        ALTER TABLE attendance
+        ADD CONSTRAINT attendance_marked_by_admin_fkey
+        FOREIGN KEY (marked_by_admin) REFERENCES administrators(admin_id);
+    END IF;
+END $$;
 
 -- Admin-Permisos
 CREATE TABLE IF NOT EXISTS admin_permissions (

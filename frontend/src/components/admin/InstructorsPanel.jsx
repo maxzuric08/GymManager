@@ -85,7 +85,7 @@ export default function InstructorsPanel() {
     setEditingInstructor(instructor.instructor_id);
     setShowForm(true);
     setFormData({
-      username: instructor.username || "", password: instructor.password || "", specialty: instructor.specialty || "",
+      username: instructor.username || "", password: "", specialty: instructor.specialty || "",
       email: instructor.email || "", phone: instructor.phone || "", first_name: instructor.first_name || "",
       last_name: instructor.last_name || "", dni: instructor.dni || "",
       birth_date: instructor.birth_date ? instructor.birth_date.slice(0, 10) : "",
@@ -156,13 +156,13 @@ export default function InstructorsPanel() {
           
           <div style={styles.grid}>
             <input name="username" placeholder="Usuario" value={formData.username} onChange={handleInputChange} required style={styles.input} />
-            <input name="password" type="password" placeholder="Contraseña" value={formData.password} onChange={handleInputChange} required style={styles.input} />
+            <input name="password" type="password" placeholder={editingInstructor ? "Nueva contraseña (opcional)" : "Contraseña"} value={formData.password} onChange={handleInputChange} required={!editingInstructor} style={styles.input} />
             <input name="first_name" placeholder="Nombre (solo letras)" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="last_name" placeholder="Apellido (solo letras)" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
             <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
             <input name="specialty" placeholder="Especialidad (Ej: Musculación)" value={formData.specialty} onChange={handleInputChange} style={styles.input} />
             <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar en .com" />
-            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s\-]/g, "") })} style={styles.input} />
+            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s-]/g, "") })} style={styles.input} />
 
            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
                <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Nacimiento</span>
