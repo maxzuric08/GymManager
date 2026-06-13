@@ -1,0 +1,208 @@
+﻿const pool = require("../db");
+const mercadoPago = require("../services/mercadoPago.service");
+
+const calculateExpirationDate = (plan, fromDate = new Date()) => {
+  const expiration = new Date(fromDate);
+  const value = Number.parseInt(plan.duration_value, 10) || 1;
+  const unit = String(plan.duration_unit || "months").toLowerCase();
+
+  if (unit === "days") expiration.setUTCDate(expiration.getUTCDate() + value);
+  else if (unit === "weeks") expiration.setUTCDate(expiration.getUTCDate() + value * 7);
+  else expiration.setUTCMonth(expiration.getUTCMonth() + value);
+
+  return expiration.toISOString().slice(0, 10);
+};
+
+const getMyPayments = async (req, res) => {
+  try {
+    const [membershipResult, paymentsResult] = await Promise.all([
+      pool.query(
+        `SELECT u.plan_id, u.plan_expiration_date, p.plan_type
+           FROM users u
+           LEFT JOIN plans p ON p.plan_id = u.plan_id
+          WHERE u.user_id = $1`,
+        [req.user.id]
+      ),
+      pool.query(
+        `SELECT pay.payment_id, pay.plan_id, p.plan_type, pay.amount, pay.payment_date,
+                pay.payment_status, pay.status_detail, pay.payment_method, pay.currency,
+                pay.approved_at, pay.expiry_date
+           FROM payments pay
+           LEFT JOIN plans p ON p.plan_id = pay.plan_id
+          WHERE pay.user_id = $1 AND pay.external_reference IS NOT NULL
+          ORDER BY pay.payment_date DESC
+          LIMIT 20`,
+        [req.user.id]
+      ),
+    ]);
+
+    res.json({ membership: membershipResult.rows[0] || null, payments: paymentsResult.rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener los pagos" });
+  }
+};
+
+const createCheckout = async (req, res) => {
+  let localPaymentId;
+  try {
+    const { planId } = req.body;
+    if (!planId) return res.status(400).json({ error: "Debes seleccionar un plan" });
+    if (!process.env.MP_ACCESS_TOKEN || !process.env.FRONTEND_URL || !process.env.BACKEND_PUBLIC_URL) {
+      return res.status(503).json({ error: "Falta configurar Mercado Pago en el archivo .env" });
+    }
+
+    const [userResult, planResult] = await Promise.all([
+      pool.query("SELECT user_id FROM users WHERE user_id = $1 AND user_status = 'active'", [req.user.id]),
+      pool.query("SELECT * FROM plans WHERE plan_id = $1 AND status = 'active'", [planId]),
+    ]);
+
+    if (!userResult.rows[0]) return res.status(404).json({ error: "Usuario no encontrado" });
+    if (!planResult.rows[0]) return res.status(404).json({ error: "Plan no encontrado o inactivo" });
+
+    const plan = planResult.rows[0];
+    const inserted = await pool.query(
+      `INSERT INTO payments (user_id, plan_id, amount, payment_status, payment_method, currency)
+       VALUES ($1, $2, $3, 'pending', 'mercadopago', 'ARS')
+       RETURNING payment_id`,
+      [req.user.id, plan.plan_id, plan.cost]
+    );
+    localPaymentId = inserted.rows[0].payment_id;
+    const externalReference = `gym-payment-${localPaymentId}`;
+
+    const preference = await mercadoPago.createPreference(
+      {
+        items: [{
+          id: String(plan.plan_id),
+          title: `GymManager - Plan ${plan.plan_type}`,
+          description: plan.benefits || `Membresia ${plan.plan_type}`,
+          quantity: 1,
+          unit_price: Number(plan.cost),
+          currency_id: "ARS",
+        }],
+        external_reference: externalReference,
+        back_urls: {
+          success: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=success`,
+          failure: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=failure`,
+          pending: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=pending`,
+        },
+        notification_url: `${process.env.BACKEND_PUBLIC_URL}/payments/webhook`,
+        auto_return: "approved",
+      },
+      externalReference
+    );
+
+    await pool.query(
+      `UPDATE payments SET preference_id = $1, external_reference = $2 WHERE payment_id = $3`,
+      [preference.id, externalReference, localPaymentId]
+    );
+
+    const isTest = process.env.MP_ACCESS_TOKEN.startsWith("TEST-");
+    res.status(201).json({
+      message: "Pago creado",
+      checkoutUrl: isTest ? preference.sandbox_init_point : preference.init_point,
+    });
+  } catch (error) {
+    if (localPaymentId) {
+      await pool.query(
+        "UPDATE payments SET payment_status = 'error', status_detail = $1 WHERE payment_id = $2",
+        [error.message, localPaymentId]
+      ).catch(() => {});
+    }
+    console.error("Error al crear checkout:", error);
+    res.status(500).json({ error: error.message || "Error al iniciar el pago" });
+  }
+};
+
+const processPayment = async (paymentId) => {
+  const payment = await mercadoPago.getPayment(String(paymentId));
+  if (!payment.external_reference?.startsWith("gym-payment-")) return;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const localResult = await client.query(
+      `SELECT pay.*, p.duration_value, p.duration_unit, p.cost
+         FROM payments pay
+         JOIN plans p ON p.plan_id = pay.plan_id
+        WHERE pay.external_reference = $1
+        FOR UPDATE`,
+      [payment.external_reference]
+    );
+    const localPayment = localResult.rows[0];
+    if (!localPayment) {
+      await client.query("ROLLBACK");
+      return;
+    }
+
+    const expectedAmount = Number(localPayment.cost);
+    const validAmount = Math.abs(Number(payment.transaction_amount) - expectedAmount) < 0.01;
+    const validCurrency = payment.currency_id === "ARS";
+
+    await client.query(
+      `UPDATE payments
+          SET mp_payment_id = $1, payment_status = $2, status_detail = $3,
+              payment_method = $4, approved_at = $5
+        WHERE payment_id = $6`,
+      [String(payment.id), payment.status, payment.status_detail || null,
+       payment.payment_method_id || "mercadopago", payment.date_approved || null,
+       localPayment.payment_id]
+    );
+
+    if (payment.status === "approved" && !localPayment.processed_at) {
+      if (!validAmount || !validCurrency) throw new Error("El monto o moneda del pago no coinciden");
+      const expirationDate = calculateExpirationDate(localPayment, payment.date_approved ? new Date(payment.date_approved) : new Date());
+
+      await client.query(
+        "UPDATE users SET plan_id = $1, plan_expiration_date = $2 WHERE user_id = $3",
+        [localPayment.plan_id, expirationDate, localPayment.user_id]
+      );
+      await client.query(
+        "UPDATE payments SET expiry_date = $1, processed_at = CURRENT_TIMESTAMP WHERE payment_id = $2",
+        [expirationDate, localPayment.payment_id]
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
+const paymentReturn = async (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const paymentId = req.query.payment_id || req.query.collection_id;
+  let result = req.query.result || req.query.status || "pending";
+
+  if (paymentId) {
+    try {
+      await processPayment(paymentId);
+      const remote = await mercadoPago.getPayment(String(paymentId));
+      result = remote.status || result;
+    } catch (error) {
+      console.error("Error verificando pago de retorno:", error);
+      result = "error";
+    }
+  }
+
+  res.redirect(`${frontendUrl}/user?payment=${encodeURIComponent(result)}`);
+};
+
+const webhook = async (req, res) => {
+  try {
+    mercadoPago.validateWebhookSignature(req);
+    const type = req.body?.type || req.query.type || req.body?.topic || req.query.topic;
+    const dataId = req.body?.data?.id || req.query["data.id"] || req.query.id;
+    if (!dataId) return res.sendStatus(200);
+    if (type === "payment") await processPayment(dataId);
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("Error procesando webhook de pago:", error);
+    res.status(500).json({ error: "No se pudo procesar la notificacion" });
+  }
+};
+
+module.exports = { createCheckout, getMyPayments, paymentReturn, webhook };

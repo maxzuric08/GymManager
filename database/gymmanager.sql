@@ -134,17 +134,41 @@ CREATE TABLE IF NOT EXISTS admin_permissions (
     PRIMARY KEY (admin_id, permission_id)
 );
 
+
 -- Pagos
 CREATE TABLE IF NOT EXISTS payments (
     payment_id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(user_id),
+    user_id INTEGER REFERENCES users(user_id),    plan_id INTEGER REFERENCES plans(plan_id),
     amount DECIMAL(10, 2) NOT NULL,
     payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expiry_date DATE,
-    payment_status VARCHAR(20),
+    payment_status VARCHAR(30),
     payment_method VARCHAR(50),
-    corresponding_month VARCHAR(20)
+    corresponding_month VARCHAR(20),
+    mp_payment_id VARCHAR(255) UNIQUE,
+    preference_id VARCHAR(255),
+    external_reference VARCHAR(100),
+    status_detail VARCHAR(100),
+    currency VARCHAR(10) DEFAULT 'ARS',
+    approved_at TIMESTAMP,
+    processed_at TIMESTAMP
 );
+
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan_id INTEGER REFERENCES plans(plan_id);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS mp_payment_id VARCHAR(255);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS preference_id VARCHAR(255);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS external_reference VARCHAR(100);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS status_detail VARCHAR(100);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'ARS';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP;
+ALTER TABLE payments ALTER COLUMN payment_status TYPE VARCHAR(30);
+
+CREATE UNIQUE INDEX IF NOT EXISTS payments_external_reference_unique
+ON payments(external_reference) WHERE external_reference IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS payments_mp_payment_unique
+ON payments(mp_payment_id) WHERE mp_payment_id IS NOT NULL;
 
 -- Notificaciones
 CREATE TABLE IF NOT EXISTS notifications (

@@ -541,3 +541,21 @@ export async function getClassAttendanceStatisticsRequest(classId) {
   if (!response.ok) throw new Error(data.error || "Error al obtener estadisticas de la clase");
   return data;
 }
+
+export async function getMyPaymentsRequest() {
+  const response = await fetch(`${API_URL}/payments/me`, { headers: getAuthHeaders() });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener los pagos");
+  return data;
+}
+
+export async function createCheckoutRequest(planId) {
+  const response = await fetch(`${API_URL}/payments/checkout`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ planId }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al iniciar el pago");
+  return data;
+}

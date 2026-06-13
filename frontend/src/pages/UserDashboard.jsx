@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import MembershipPanel from "../components/user/MembershipPanel";
 import {
   getPlansRequest,
-  updateUserPlanRequest,
   logoutRequest,
   getClassesRequest,
   getUserBookingsRequest,
@@ -16,7 +16,9 @@ import {
 export default function UserDashboard() {
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState("classes");
+  const [activeTab, setActiveTab] = useState(() =>
+      new URLSearchParams(window.location.search).has("payment") ? "membership" : "classes"
+  );
   const [currentUser, setCurrentUser] = useState(
       JSON.parse(localStorage.getItem("user") || "{}")
   );
@@ -101,22 +103,6 @@ export default function UserDashboard() {
   const clearMessages = () => {
     setMessage("");
     setError("");
-  };
-
-  const handleSelectPlan = async (plan) => {
-    try {
-      const result = await updateUserPlanRequest(currentUser.user_id, plan.plan_id);
-      const updatedUser = { ...currentUser, plan_id: plan.plan_id };
-
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-      setCurrentUser(updatedUser);
-
-      setMessage(result.message);
-      setError("");
-    } catch (err) {
-      setError(err.message);
-      setMessage("");
-    }
   };
 
   const handleBookClass = async (classId) => {
@@ -209,8 +195,18 @@ export default function UserDashboard() {
     navigate("/");
   };
 
-  const currentPlan = plans.find((p) => p.plan_id === currentUser.plan_id);
 
+  const handleMembershipUpdated = useCallback((membership) => {
+    setCurrentUser((previousUser) => {
+      const updatedUser = {
+        ...previousUser,
+        plan_id: membership.plan_id,
+        plan_expiration_date: membership.plan_expiration_date,
+      };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      return updatedUser;
+    });
+  }, []);
   const formatDate = (dateString) =>
       new Date(dateString).toLocaleDateString("es-AR", {
         weekday: "long",
@@ -353,64 +349,12 @@ export default function UserDashboard() {
         )}
 
         {activeTab === "membership" && (
-            <div>
-              <div
-                  style={{
-                    ...styles.card,
-                    marginBottom: "2rem",
-                    background: "#f8fafc",
-                    border: "1px solid #e2e8f0",
-                  }}
-              >
-                <h2>Mi membresia actual</h2>
-                <p style={{ fontSize: "1.1rem" }}>
-                  {currentPlan ? (
-                      <span>
-                  Tenes activo el plan: <strong>{currentPlan.plan_type}</strong>
-                </span>
-                  ) : (
-                      "Aun no tenes una membresia seleccionada."
-                  )}
-                </p>
-              </div>
-
-              <h2>Planes disponibles para mejorar</h2>
-
-              <div style={styles.grid}>
-                {plans.map((plan) => {
-                  const isCurrentPlan = currentUser.plan_id === plan.plan_id;
-
-                  return (
-                      <div key={plan.plan_id} style={styles.card}>
-                        <h3 style={{ margin: "0 0 10px 0" }}>{plan.plan_type}</h3>
-                        <p>
-                          <strong>Precio:</strong> ${plan.cost}
-                        </p>
-                        <p>
-                          <strong>Duracion:</strong> {plan.duration}
-                        </p>
-                        <p>
-                          <strong>Beneficios:</strong> {plan.benefits}
-                        </p>
-
-                        <button
-                            onClick={() => handleSelectPlan(plan)}
-                            disabled={isCurrentPlan}
-                            style={{
-                              ...styles.button,
-                              background: isCurrentPlan ? "#94a3b8" : "#f97316",
-                              cursor: isCurrentPlan ? "not-allowed" : "pointer",
-                            }}
-                        >
-                          {isCurrentPlan ? "Plan actual" : "Adquirir Plan"}
-                        </button>
-                      </div>
-                  );
-                })}
-              </div>
-            </div>
+            <MembershipPanel
+                plans={plans}
+                currentUser={currentUser}
+                onMembershipUpdated={handleMembershipUpdated}
+            />
         )}
-
         {activeTab === "medical-certificate" && (
             <div>
               <div
