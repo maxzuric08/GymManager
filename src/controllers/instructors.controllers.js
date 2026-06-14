@@ -225,6 +225,36 @@ const reactivateInstructor = async (req, res) => {
     }
 };
 
+const updateMyAvailability = async (req, res) => {
+    try {
+        const { available_from, available_to } = req.body;
+
+        if (!available_from || !available_to) {
+            return res.status(400).json({ error: "Debés ingresar ambos horarios" });
+        }
+
+        if (available_from >= available_to) {
+            return res.status(400).json({ error: "La hora de fin debe ser mayor a la hora de inicio" });
+        }
+
+        const result = await pool.query(
+            `UPDATE instructors SET available_from = $1, available_to = $2
+             WHERE instructor_id = $3
+             RETURNING instructor_id, username, available_from, available_to`,
+            [available_from, available_to, req.user.id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Instructor no encontrado" });
+        }
+
+        res.json({ message: "Disponibilidad actualizada correctamente", instructor: result.rows[0] });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al actualizar disponibilidad" });
+    }
+};
+
 module.exports = {
     getInstructors,
     createInstructor,
@@ -232,5 +262,6 @@ module.exports = {
     deleteInstructor,
     deactivateMyAccount,
     reactivateMyAccount,
-    reactivateInstructor
+    reactivateInstructor,
+    updateMyAvailability
 };

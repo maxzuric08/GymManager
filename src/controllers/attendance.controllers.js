@@ -91,7 +91,7 @@ const saveClassAttendance = async (req, res) => {
             await client.query(
                 `INSERT INTO attendance (booking_id, class_id, status, notes, marked_by_admin, check_in_time)
                  VALUES ($1, $2, $3, $4, $5,
-                         CASE WHEN $3 IN ('present', 'late') THEN CURRENT_TIMESTAMP ELSE NULL END)
+                         CASE WHEN $3::varchar IN ('present', 'late') THEN CURRENT_TIMESTAMP ELSE NULL END)
                  ON CONFLICT (booking_id)
                  DO UPDATE SET status = EXCLUDED.status,
                                notes = EXCLUDED.notes,
@@ -221,9 +221,198 @@ const getAttendanceOverview = async (req, res) => {
     }
 };
 
+const getInstructorClassAttendance = async (req, res) => {
+    try {
+        const { classId } = req.params;
+        const instructorId = req.user.id;
+
+        const classResult = await pool.query(
+            `SELECT c.class_id, c.class_name, c.class_date, c.start_time, c.end_time, c.capacity, c.status
+             FROM classes c
+             WHERE c.class_id = $1 AND c.instructor_id = $2`,
+            [classId, instructorId]
+        );
+
+        if (classResult.rows.length === 0) {
+            return res.status(404).json({ error: "Clase no encontrada o no te pertenece" });
+        }
+
+        const studentsResult = await pool.query(
+            `SELECT b.booking_id,
+                    u.user_id,
+                    u.username,
+                    u.first_name,
+                    u.last_name,
+                    u.dni,
+                    a.attendance_id,
+                    a.status AS attendance_status,
+                    a.notes,
+                    a.check_in_time
+             FROM bookings b
+             JOIN users u ON b.user_id = u.user_id
+             LEFT JOIN attendance a ON a.booking_id = b.booking_id
+             WHERE b.class_id = $1 AND b.status = 'confirmed'
+             ORDER BY u.first_name ASC, u.last_name ASC`,
+            [classId]
+        );
+
+        res.json({ class: classResult.rows[0], students: studentsResult.rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener la asistencia" });
+    }
+};
+
+const saveInstructorClassAttendance = async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+        const { classId } = req.params;
+        const { attendances } = req.body;
+        const instructorId = req.user.id;
+
+        if (!Array.isArray(attendances) || attendances.length === 0) {
+            return res.status(400).json({ error: "Debes enviar al menos una asistencia" });
+        }
+
+        const bookingIds = attendances.map((item) => Number(item.booking_id));
+        if (bookingIds.some((id) => !Number.isInteger(id)) || new Set(bookingIds).size !== bookingIds.length) {
+            return res.status(400).json({ error: "Las reservas enviadas no son validas" });
+        }
+
+        if (attendances.some((item) => !VALID_STATUSES.includes(item.status))) {
+            return res.status(400).json({ error: "Estado de asistencia invalido" });
+        }
+
+        await client.query("BEGIN");
+
+        const classResult = await client.query(
+            "SELECT class_id, class_date FROM classes WHERE class_id = $1 AND instructor_id = $2",
+            [classId, instructorId]
+        );
+        if (classResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return res.status(404).json({ error: "Clase no encontrada o no te pertenece" });
+        }
+
+        const classDate = classResult.rows[0].class_date.toISOString().slice(0, 10);
+        const todayDate = new Date().toISOString().slice(0, 10);
+        if (classDate !== todayDate) {
+            await client.query("ROLLBACK");
+            return res.status(403).json({ error: "Solo podés registrar asistencia el día de la clase" });
+        }
+
+        const bookingsResult = await client.query(
+            `SELECT booking_id FROM bookings
+             WHERE class_id = $1 AND status = 'confirmed' AND booking_id = ANY($2::int[])`,
+            [classId, bookingIds]
+        );
+
+        if (bookingsResult.rows.length !== bookingIds.length) {
+            await client.query("ROLLBACK");
+            return res.status(400).json({ error: "Alguna reserva no pertenece a la clase" });
+        }
+
+        for (const item of attendances) {
+            await client.query(
+                `INSERT INTO attendance (booking_id, class_id, status, notes, marked_by_admin, check_in_time)
+                 VALUES ($1, $2, $3, $4, $5,
+                         CASE WHEN $3::varchar IN ('present', 'late') THEN CURRENT_TIMESTAMP ELSE NULL END)
+                 ON CONFLICT (booking_id)
+                 DO UPDATE SET status = EXCLUDED.status,
+                               notes = EXCLUDED.notes,
+                               marked_by_admin = EXCLUDED.marked_by_admin,
+                               check_in_time = CASE
+                                   WHEN EXCLUDED.status IN ('present', 'late') THEN CURRENT_TIMESTAMP
+                                   ELSE NULL
+                               END`,
+                [item.booking_id, classId, item.status, item.notes?.trim() || null, instructorId]
+            );
+        }
+
+        await client.query("COMMIT");
+        res.json({ message: "Asistencias guardadas correctamente" });
+    } catch (error) {
+        await client.query("ROLLBACK");
+        console.error(error);
+        res.status(500).json({ error: "Error al guardar asistencias" });
+    } finally {
+        client.release();
+    }
+};
+
+const getInstructorAttendanceHistory = async (req, res) => {
+    try {
+        const instructorId = req.user.id;
+        const { date_from, date_to } = req.query;
+
+        if (!isValidDate(date_from) || !isValidDate(date_to)) {
+            return res.status(400).json({ error: "Formato de fecha invalido" });
+        }
+
+        const from = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+        const to = date_to || new Date().toISOString().slice(0, 10);
+
+        if (from > to) {
+            return res.status(400).json({ error: "La fecha desde no puede ser posterior a la fecha hasta" });
+        }
+
+        const classesResult = await pool.query(
+            `SELECT c.class_id,
+                    c.class_name,
+                    c.class_date,
+                    c.start_time,
+                    c.end_time,
+                    c.capacity,
+                    COUNT(DISTINCT b.booking_id)::integer AS booked,
+                    COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'present')::integer AS present,
+                    COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'absent')::integer AS absent,
+                    COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'late')::integer AS late,
+                    COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'excused')::integer AS excused,
+                    COUNT(DISTINCT a.attendance_id)::integer AS attendance_registered,
+                    ROUND(CASE WHEN COUNT(DISTINCT b.booking_id) = 0 THEN 0
+                         ELSE 100.0 * COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status IN ('present', 'late'))
+                              / COUNT(DISTINCT b.booking_id) END, 2) AS attendance_rate,
+                    ROUND(CASE WHEN COALESCE(c.capacity, 0) = 0 THEN 0
+                         ELSE 100.0 * COUNT(DISTINCT b.booking_id) / c.capacity END, 2) AS occupancy_rate
+             FROM classes c
+             LEFT JOIN bookings b ON b.class_id = c.class_id AND b.status = 'confirmed'
+             LEFT JOIN attendance a ON a.booking_id = b.booking_id
+             WHERE c.instructor_id = $1 AND c.class_date BETWEEN $2 AND $3
+             GROUP BY c.class_id
+             ORDER BY c.class_date DESC, c.start_time DESC`,
+            [instructorId, from, to]
+        );
+
+        const summary = classesResult.rows.reduce(
+            (totals, item) => ({
+                classes: totals.classes + 1,
+                booked: totals.booked + item.booked,
+                present: totals.present + item.present,
+                absent: totals.absent + item.absent,
+                late: totals.late + item.late,
+                excused: totals.excused + item.excused,
+            }),
+            { classes: 0, booked: 0, present: 0, absent: 0, late: 0, excused: 0 }
+        );
+
+        summary.attendance_rate = summary.booked
+            ? Number((((summary.present + summary.late) * 100) / summary.booked).toFixed(2))
+            : 0;
+
+        res.json({ date_from: from, date_to: to, summary, classes: classesResult.rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Error al obtener el historial de asistencia" });
+    }
+};
+
 module.exports = {
     getClassAttendance,
     saveClassAttendance,
     getClassAttendanceStatistics,
-    getAttendanceOverview
+    getAttendanceOverview,
+    getInstructorClassAttendance,
+    saveInstructorClassAttendance,
+    getInstructorAttendanceHistory
 };

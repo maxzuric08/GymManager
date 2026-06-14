@@ -140,6 +140,7 @@ export default function AttendancePanel() {
               <th style={styles.th}>Presentes</th>
               <th style={styles.th}>Ausentes</th>
               <th style={styles.th}>Tarde</th>
+              <th style={styles.th}>Justificados</th>
               <th style={styles.th}>Asistencia</th>
               <th style={styles.th}>Accion</th>
             </tr>
@@ -157,6 +158,7 @@ export default function AttendancePanel() {
                 <td style={styles.td}>{gymClass.present}</td>
                 <td style={styles.td}>{gymClass.absent}</td>
                 <td style={styles.td}>{gymClass.late}</td>
+                <td style={styles.td}>{gymClass.excused}</td>
                 <td style={styles.td}>{gymClass.attendance_rate}%</td>
                 <td style={styles.td}>
                   <button onClick={() => openClass(gymClass.class_id)} style={styles.actionBtn}>

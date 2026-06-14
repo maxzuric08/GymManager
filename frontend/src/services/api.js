@@ -559,3 +559,44 @@ export async function createCheckoutRequest(planId) {
   if (!response.ok) throw new Error(data.error || "Error al iniciar el pago");
   return data;
 }
+
+export async function updateMyAvailabilityRequest(available_from, available_to) {
+  const response = await fetch(`${API_URL}/instructors/availability/me`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ available_from, available_to }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al actualizar disponibilidad");
+  return data;
+}
+
+export async function getInstructorClassAttendanceRequest(classId) {
+  const response = await fetch(`${API_URL}/attendance/instructor/classes/${classId}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener asistencia");
+  return data;
+}
+
+export async function saveInstructorClassAttendanceRequest(classId, attendances) {
+  const response = await fetch(`${API_URL}/attendance/instructor/classes/${classId}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ attendances }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al guardar asistencia");
+  return data;
+}
+
+export async function getInstructorAttendanceHistoryRequest(dateFrom, dateTo) {
+  const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+  const response = await fetch(`${API_URL}/attendance/instructor/history?${params}`, {
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener historial de asistencia");
+  return data;
+}
