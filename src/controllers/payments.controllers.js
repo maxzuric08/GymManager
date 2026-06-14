@@ -205,4 +205,54 @@ const webhook = async (req, res) => {
   }
 };
 
-module.exports = { createCheckout, getMyPayments, paymentReturn, webhook };
+const getAllPayments = async (req, res) => {
+  try {
+    const { user_id, status, date_from, date_to } = req.query;
+    const conditions = ["pay.external_reference IS NOT NULL"];
+    const params = [];
+    let idx = 1;
+
+    if (user_id) { conditions.push(`pay.user_id = $${idx++}`); params.push(user_id); }
+    if (status)  { conditions.push(`pay.payment_status = $${idx++}`); params.push(status); }
+    if (date_from) { conditions.push(`pay.payment_date::date >= $${idx++}`); params.push(date_from); }
+    if (date_to)   { conditions.push(`pay.payment_date::date <= $${idx++}`); params.push(date_to); }
+
+    const where = `WHERE ${conditions.join(" AND ")}`;
+
+    const [paymentsResult, statsResult] = await Promise.all([
+      pool.query(
+        `SELECT pay.payment_id, pay.user_id, u.username, u.first_name, u.last_name,
+                pay.plan_id, p.plan_type, pay.amount, pay.payment_date,
+                pay.payment_status, pay.status_detail, pay.payment_method, pay.currency,
+                pay.approved_at, pay.expiry_date
+           FROM payments pay
+           LEFT JOIN users u ON u.user_id = pay.user_id
+           LEFT JOIN plans p ON p.plan_id = pay.plan_id
+           ${where}
+           ORDER BY pay.payment_date DESC
+           LIMIT 200`,
+        params
+      ),
+      pool.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE pay.external_reference IS NOT NULL)::int AS total,
+           COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_status = 'approved'), 0)::numeric AS total_approved_amount,
+           COUNT(*) FILTER (WHERE pay.payment_status = 'approved')::int AS approved,
+           COUNT(*) FILTER (WHERE pay.payment_status = 'pending')::int AS pending,
+           COUNT(*) FILTER (WHERE pay.payment_status = 'rejected')::int AS rejected
+           FROM payments pay
+           LEFT JOIN users u ON u.user_id = pay.user_id
+           LEFT JOIN plans p ON p.plan_id = pay.plan_id
+           ${where}`,
+        params
+      ),
+    ]);
+
+    res.json({ payments: paymentsResult.rows, stats: statsResult.rows[0] });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error al obtener los pagos" });
+  }
+};
+
+module.exports = { createCheckout, getMyPayments, paymentReturn, webhook, getAllPayments };

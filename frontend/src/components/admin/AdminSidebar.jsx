@@ -11,6 +11,7 @@ export default function AdminSidebar({
     { key: "classes", label: "Clases", icon: "📅" },
     { key: "medical-certificates", label: "Aptos Medicos", icon: "📄" },
     { key: "attendance", label: "Asistencias", icon: "✓" },
+    { key: "payments", label: "Pagos", icon: "$" },
   ];
 
   return (

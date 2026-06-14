@@ -591,6 +591,19 @@ export async function saveInstructorClassAttendanceRequest(classId, attendances)
   return data;
 }
 
+export async function getAllPaymentsAdminRequest({ userId, status, dateFrom, dateTo } = {}) {
+  const params = new URLSearchParams();
+  if (userId) params.set("user_id", userId);
+  if (status) params.set("status", status);
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo) params.set("date_to", dateTo);
+  const query = params.toString() ? `?${params}` : "";
+  const response = await fetch(`${API_URL}/payments/all${query}`, { headers: getAuthHeaders() });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al obtener los pagos");
+  return data;
+}
+
 export async function getInstructorAttendanceHistoryRequest(dateFrom, dateTo) {
   const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
   const response = await fetch(`${API_URL}/attendance/instructor/history?${params}`, {

@@ -11,6 +11,7 @@ import {
   getMyMedicalCertificateRequest,
   uploadMedicalCertificateRequest,
   openMedicalCertificateFile,
+  getMyPaymentsRequest,
 } from "../services/api";
 
 export default function UserDashboard() {
@@ -29,6 +30,7 @@ export default function UserDashboard() {
 
   const [medicalCertificate, setMedicalCertificate] = useState(null);
   const [medicalFile, setMedicalFile] = useState(null);
+  const [myPayments, setMyPayments] = useState([]);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -267,6 +269,22 @@ export default function UserDashboard() {
           >
             Apto Medico
           </button>
+
+          <button
+              onClick={async () => {
+                setActiveTab("payments");
+                clearMessages();
+                try {
+                  const data = await getMyPaymentsRequest();
+                  setMyPayments(data.payments || []);
+                } catch (err) {
+                  setError(err.message);
+                }
+              }}
+              style={activeTab === "payments" ? styles.activeTab : styles.tab}
+          >
+            Mis Pagos
+          </button>
         </div>
 
         {message && <p style={styles.success}>{message}</p>}
@@ -448,6 +466,54 @@ export default function UserDashboard() {
               </div>
             </div>
         )}
+
+        {activeTab === "payments" && (
+          <div>
+            <h2 style={{ marginBottom: "1.5rem" }}>Mis Pagos</h2>
+            {myPayments.length === 0 ? (
+              <div style={styles.card}>
+                <p style={{ color: "#64748b", margin: 0 }}>No tenés pagos registrados aún.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={styles.paymentsTable}>
+                  <thead>
+                    <tr>
+                      <th style={styles.pth}>#</th>
+                      <th style={styles.pth}>Plan</th>
+                      <th style={styles.pth}>Monto</th>
+                      <th style={styles.pth}>Fecha</th>
+                      <th style={styles.pth}>Vencimiento</th>
+                      <th style={styles.pth}>Método</th>
+                      <th style={styles.pth}>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myPayments.map((p) => (
+                      <tr key={p.payment_id}>
+                        <td style={styles.ptd}>{p.payment_id}</td>
+                        <td style={styles.ptd}>{p.plan_type || "-"}</td>
+                        <td style={styles.ptd}>${Number(p.amount).toLocaleString("es-AR")}</td>
+                        <td style={styles.ptd}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString("es-AR") : "-"}</td>
+                        <td style={styles.ptd}>{p.expiry_date ? new Date(`${p.expiry_date}T00:00:00`).toLocaleDateString("es-AR") : "-"}</td>
+                        <td style={styles.ptd}>{p.payment_method || "-"}</td>
+                        <td style={styles.ptd}>
+                          <span style={{
+                            padding: "3px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold",
+                            backgroundColor: p.payment_status === "approved" ? "#dcfce7" : p.payment_status === "pending" ? "#fef9c3" : "#fee2e2",
+                            color: p.payment_status === "approved" ? "#15803d" : p.payment_status === "pending" ? "#854d0e" : "#b91c1c",
+                          }}>
+                            {p.payment_status === "approved" ? "Aprobado" : p.payment_status === "pending" ? "Pendiente" : p.payment_status === "rejected" ? "Rechazado" : p.payment_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
   );
 }
@@ -614,4 +680,7 @@ const styles = {
     cursor: "pointer",
     fontWeight: "bold",
   },
+  paymentsTable: { width: "100%", borderCollapse: "collapse", backgroundColor: "white", borderRadius: "10px", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" },
+  pth: { backgroundColor: "#0f172a", color: "white", padding: "12px 16px", textAlign: "left", fontSize: "0.85rem" },
+  ptd: { padding: "12px 16px", borderBottom: "1px solid #f1f5f9", color: "#334155", fontSize: "0.9rem" },
 };
