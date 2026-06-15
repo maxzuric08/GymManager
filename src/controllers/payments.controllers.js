@@ -61,7 +61,13 @@ const createCheckout = async (req, res) => {
     await client.query("SELECT pg_advisory_xact_lock($1, $2)", [7412, req.user.id]);
 
     const userResult = await client.query(
-      "SELECT user_id FROM users WHERE user_id = $1 AND user_status = 'active'",
+      `SELECT user_id,
+              plan_id,
+              plan_expiration_date,
+              (plan_expiration_date - CURRENT_DATE)::int AS days_until_expiration,
+              (plan_expiration_date - INTERVAL '5 days')::date AS renewal_available_from
+         FROM users
+        WHERE user_id = $1 AND user_status = 'active'`,
       [req.user.id]
     );
     const planResult = await client.query(
@@ -76,6 +82,20 @@ const createCheckout = async (req, res) => {
     if (!planResult.rows[0]) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Plan no encontrado o inactivo" });
+    }
+
+    const user = userResult.rows[0];
+    if (
+      user.plan_id
+      && user.plan_expiration_date
+      && Number(user.days_until_expiration) > 5
+    ) {
+      await client.query("ROLLBACK");
+      const availableFrom = user.renewal_available_from.toISOString().slice(0, 10);
+      return res.status(409).json({
+        error: `Todavia tenes una membresia activa. Podras renovar o cambiar de plan desde el ${availableFrom}.`,
+        renewal_available_from: availableFrom,
+      });
     }
 
     const plan = planResult.rows[0];
