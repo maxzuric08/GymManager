@@ -8,6 +8,7 @@ import {
   saveInstructorClassAttendanceRequest,
   getInstructorAttendanceHistoryRequest,
   updateMyAvailabilityRequest,
+  getClassStudentsRequest,
 } from "../services/api";
 
 const STATUS_LABELS = {
@@ -17,10 +18,11 @@ const STATUS_LABELS = {
   excused: { label: "Justificado", color: "#6366f1" },
 };
 
-const CLASS_STATUS_LABELS = {
-  scheduled: "Programada",
-  active: "Activa",
-  cancelled: "Cancelada",
+const getClassDisplayStatus = (cls, isPast) => {
+  if (cls.status === "cancelled") return { label: "Cancelada", style: "cancelled" };
+  if (cls.status === "inactive")  return { label: "Inactiva",  style: "cancelled" };
+  if (isPast)                     return { label: "Dictada",   style: "past" };
+  return { label: "Programada", style: "active" };
 };
 
 const formatInputDate = (date) => {
@@ -66,6 +68,25 @@ export default function InstructorDashboard() {
   const [attendanceData, setAttendanceData] = useState({});
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [attendanceSaved, setAttendanceSaved] = useState(false);
+
+  // Students view modal
+  const [studentsModal, setStudentsModal] = useState(null);
+  const [studentsData, setStudentsData] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
+  const openStudentsModal = async (cls) => {
+    setStudentsModal(cls);
+    setLoadingStudents(true);
+    try {
+      const data = await getClassStudentsRequest(cls.class_id);
+      setStudentsData(data.students || data);
+    } catch (err) {
+      setModal({ isOpen: true, title: "Error", message: err.message, type: "error" });
+      setStudentsModal(null);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
   const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
 
   useEffect(() => {
@@ -269,12 +290,14 @@ export default function InstructorDashboard() {
                   <div style={styles.cardHeader}>
                     <h3 style={{ margin: 0, color: "#132238" }}>{cls.class_name}</h3>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                      <span style={cls.status === "cancelled" ? styles.badgeCancelled : styles.badgeActive}>
-                        {CLASS_STATUS_LABELS[cls.status] || cls.status}
-                      </span>
-                      {isPast && (
-                        <span style={styles.badgePast}>Pasada</span>
-                      )}
+                      {(() => {
+                        const ds = getClassDisplayStatus(cls, isPast);
+                        return (
+                          <span style={ds.style === "cancelled" ? styles.badgeCancelled : ds.style === "past" ? styles.badgePast : styles.badgeActive}>
+                            {ds.label}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   <div style={styles.cardBody}>
@@ -292,11 +315,15 @@ export default function InstructorDashboard() {
                           {hasAttendance ? "Editar Asistencia" : "Registrar Asistencia"}
                         </button>
                       ) : isPast ? (
-                        <p style={styles.attendanceExpired}>Plazo vencido</p>
+                        <button onClick={() => openStudentsModal(cls)} style={styles.studentsBtn}>
+                          Ver alumnos
+                        </button>
                       ) : isToday ? (
                         <p style={styles.attendancePending}>Disponible desde las {cls.start_time?.slice(0, 5)}</p>
                       ) : (
-                        <p style={styles.attendancePending}>Disponible el día de la clase</p>
+                        <button onClick={() => openStudentsModal(cls)} style={styles.studentsBtn}>
+                          Ver alumnos
+                        </button>
                       )}
                     </div>
                   )}
@@ -463,6 +490,44 @@ export default function InstructorDashboard() {
         onCancel={() => setModal({ ...modal, isOpen: false })}
         confirmText="Aceptar"
       />
+
+      {studentsModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+              <div>
+                <h3 style={{ margin: 0 }}>{studentsModal.class_name}</h3>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "0.9rem" }}>
+                  {formatDate(studentsModal.class_date)} · {studentsModal.start_time?.slice(0, 5)} a {studentsModal.end_time?.slice(0, 5)}
+                </p>
+              </div>
+              <button onClick={() => setStudentsModal(null)} style={styles.closeBtn}>✕</button>
+            </div>
+
+            {loadingStudents ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: "20px" }}>Cargando alumnos...</p>
+            ) : studentsData.length === 0 ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: "20px" }}>No hay alumnos anotados en esta clase.</p>
+            ) : (
+              <div style={{ display: "grid", gap: "8px" }}>
+                {studentsData.map((student) => (
+                  <div key={student.booking_id || student.user_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                    <div>
+                      <strong style={{ color: "#0f172a" }}>{student.first_name} {student.last_name}</strong>
+                      <span style={{ color: "#64748b", fontSize: "0.82rem", marginLeft: "8px" }}>{student.username}</span>
+                    </div>
+                    <span style={{ color: "#64748b", fontSize: "0.82rem" }}>DNI {student.dni || "-"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
+              <button onClick={() => setStudentsModal(null)} style={styles.cancelBtn}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -494,6 +559,7 @@ const styles = {
   attendanceExpired: { margin: 0, color: "#94a3b8", fontSize: "0.85rem", fontWeight: "bold", textAlign: "center", padding: "10px 0" },
   attendancePending: { margin: 0, color: "#64748b", fontSize: "0.85rem", textAlign: "center", padding: "10px 0" },
   attendanceBtn: { width: "100%", padding: "10px", backgroundColor: "#1e293b", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
+  studentsBtn: { width: "100%", padding: "10px", backgroundColor: "#2563eb", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
   emptyState: { padding: "3rem", textAlign: "center", color: "#64748b", backgroundColor: "white", borderRadius: "12px", gridColumn: "1 / -1", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" },
   // Historial
   historialHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "20px", marginBottom: "20px", flexWrap: "wrap" },

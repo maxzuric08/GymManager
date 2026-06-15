@@ -1,10 +1,21 @@
 import { useState, useEffect } from "react";
+
+const getClassDisplayStatus = (cls) => {
+  const dateStr = cls.class_date ? cls.class_date.slice(0, 10) : null;
+  const isPast = dateStr ? new Date(`${dateStr}T${cls.end_time || "23:59:00"}`) < new Date() : false;
+  if (cls.status === "cancelled") return { label: "Cancelada", color: "#b91c1c", bg: "#fee2e2" };
+  if (cls.status === "inactive")  return { label: "Inactiva",  color: "#64748b", bg: "#f1f5f9" };
+  if (isPast)                     return { label: "Dictada",   color: "#854d0e", bg: "#fef9c3" };
+  return { label: "Programada", color: "#166534", bg: "#dcfce7" };
+};
 import {
   getClassesRequest,
   createClassRequest,
   updateClassRequest,
   deleteClassRequest,
+  reactivateClassRequest,
   getInstructorsRequest,
+  getClassStudentsRequest,
 } from "../../services/api";
 
 export default function ClassesPanel() {
@@ -14,6 +25,24 @@ export default function ClassesPanel() {
   const [showForm, setShowForm] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
   const [classToDelete, setClassToDelete] = useState(null);
+  const [studentsModal, setStudentsModal] = useState(null);
+  const [studentsData, setStudentsData] = useState([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+
+  const openStudentsModal = async (cls) => {
+    setStudentsModal(cls);
+    setStudentsData([]);
+    setLoadingStudents(true);
+    try {
+      const data = await getClassStudentsRequest(cls.class_id);
+      setStudentsData(data.students || data);
+    } catch (err) {
+      setError(err.message);
+      setStudentsModal(null);
+    } finally {
+      setLoadingStudents(false);
+    }
+  };
 
   const [formData, setFormData] = useState({
     instructor_id: "",
@@ -89,16 +118,24 @@ export default function ClassesPanel() {
   };
 
   const confirmDeleteClass = async () => {
-            if (!classToDelete) return;
+    if (!classToDelete) return;
+    try {
+      await deleteClassRequest(classToDelete.class_id);
+      setClassToDelete(null);
+      fetchClasses();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
-            try {
-              await deleteClassRequest(classToDelete.class_id);
-              setClassToDelete(null);
-              fetchClasses();
-            } catch (err) {
-              alert(err.message);
-            }
-          };
+  const handleReactivateClass = async (classId) => {
+    try {
+      await reactivateClassRequest(classId);
+      fetchClasses();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -365,17 +402,24 @@ const handleSubmit = async (e) => {
                   {cls.start_time} - {cls.end_time}
                 </td>
                 <td style={styles.td}>{cls.capacity}</td>
-                <td style={styles.td}>{cls.status}</td>
                 <td style={styles.td}>
-                  <button
-                    onClick={() => handleEdit(cls)}
-                    style={styles.editBtn}
-                  >
-                    Editar
-                  </button>
-                  <button onClick={() => setClassToDelete(cls)} style={styles.deleteBtn}>
-                      Eliminar
-                  </button>
+                  {(() => {
+                    const ds = getClassDisplayStatus(cls);
+                    return <span style={{ background: ds.bg, color: ds.color, padding: "3px 10px", borderRadius: "20px", fontSize: "0.8rem", fontWeight: 700 }}>{ds.label}</span>;
+                  })()}
+                </td>
+                <td style={styles.td}>
+                  <button onClick={() => openStudentsModal(cls)} style={styles.studentsBtn}>Ver alumnos</button>
+                  <button onClick={() => handleEdit(cls)} style={styles.editBtn}>Editar</button>
+                  {cls.status === "inactive" ? (
+                    <button onClick={() => handleReactivateClass(cls.class_id)} style={styles.reactivateBtn}>
+                      Reactivar
+                    </button>
+                  ) : (
+                    <button onClick={() => setClassToDelete(cls)} style={styles.deleteBtn}>
+                      Desactivar
+                    </button>
+                  )}
                 </td>
               </tr>
             ))
@@ -408,6 +452,44 @@ const handleSubmit = async (e) => {
                       </div>
                     </div>
                   )}
+
+      {studentsModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+              <div>
+                <h3 style={styles.modalTitle}>{studentsModal.class_name}</h3>
+                <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: "0.9rem" }}>
+                  {formatDate(studentsModal.class_date)} · {studentsModal.start_time} - {studentsModal.end_time}
+                </p>
+              </div>
+              <button onClick={() => setStudentsModal(null)} style={{ border: 0, background: "#e2e8f0", borderRadius: "6px", width: "32px", height: "32px", cursor: "pointer", fontSize: "1.1rem" }}>✕</button>
+            </div>
+
+            {loadingStudents ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: "20px" }}>Cargando alumnos...</p>
+            ) : studentsData.length === 0 ? (
+              <p style={{ color: "#64748b", textAlign: "center", padding: "20px" }}>No hay alumnos anotados en esta clase.</p>
+            ) : (
+              <div style={{ display: "grid", gap: "8px", maxHeight: "400px", overflowY: "auto" }}>
+                {studentsData.map((student) => (
+                  <div key={student.booking_id || student.user_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
+                    <div>
+                      <strong style={{ color: "#0f172a" }}>{student.first_name} {student.last_name}</strong>
+                      <span style={{ color: "#64748b", fontSize: "0.82rem", marginLeft: "8px" }}>{student.username}</span>
+                    </div>
+                    <span style={{ color: "#94a3b8", fontSize: "0.82rem" }}>DNI {student.dni || "-"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
+              <button onClick={() => setStudentsModal(null)} style={{ padding: "8px 16px", border: "1px solid #cbd5e1", borderRadius: "8px", background: "white", cursor: "pointer", fontWeight: 600 }}>Cerrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -461,6 +543,15 @@ const styles = {
     borderRadius: "4px",
     border: "1px solid #ccc",
   },
+  studentsBtn: {
+    background: "#0891b2",
+    color: "white",
+    border: "none",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    marginRight: "8px",
+    cursor: "pointer",
+  },
   editBtn: {
     background: "#2563eb",
     color: "white",
@@ -468,6 +559,7 @@ const styles = {
     padding: "6px 10px",
     borderRadius: "8px",
     marginRight: "8px",
+    cursor: "pointer",
   },
   deleteBtn: {
     background: "#ef4444",
@@ -475,6 +567,15 @@ const styles = {
     border: "none",
     padding: "6px 10px",
     borderRadius: "8px",
+    cursor: "pointer",
+  },
+  reactivateBtn: {
+    background: "#22c55e",
+    color: "white",
+    border: "none",
+    padding: "6px 10px",
+    borderRadius: "8px",
+    cursor: "pointer",
   },
 modalOverlay: {
       position: "fixed",

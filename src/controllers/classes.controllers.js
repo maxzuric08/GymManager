@@ -166,13 +166,30 @@ const updateClass = async (req, res) => {
 
 const deleteClass = async (req, res) => {
   try {
-    const result = await pool.query("DELETE FROM classes WHERE class_id = $1 RETURNING *", [req.params.id]);
+    const result = await pool.query(
+      "UPDATE classes SET status = 'inactive' WHERE class_id = $1 RETURNING *",
+      [req.params.id]
+    );
     if (!result.rows[0]) return res.status(404).json({ error: "Clase no encontrada" });
-    return res.json({ message: "Clase eliminada", class: result.rows[0] });
+    return res.json({ message: "Clase desactivada", class: result.rows[0] });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: "Error al eliminar la clase" });
+    return res.status(500).json({ error: "Error al desactivar la clase" });
   }
 };
 
-module.exports = { getClasses, createClass, updateClass, deleteClass };
+const reactivateClass = async (req, res) => {
+  try {
+    const result = await pool.query(
+      "UPDATE classes SET status = 'active' WHERE class_id = $1 RETURNING *",
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: "Clase no encontrada" });
+    return res.json({ message: "Clase reactivada", class: result.rows[0] });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Error al reactivar la clase" });
+  }
+};
+
+module.exports = { getClasses, createClass, updateClass, deleteClass, reactivateClass };

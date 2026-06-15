@@ -1,5 +1,15 @@
 const API_URL = "http://localhost:3000";
 
+async function apiFetch(url, options = {}) {
+  const response = await fetch(url, options);
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent("session-expired"));
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error || "Sesión expirada");
+  }
+  return response;
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem("token");
 
@@ -28,7 +38,7 @@ export async function loginRequest(loginData) {
 }
 
 export async function logoutRequest() {
-  const response = await fetch(`${API_URL}/auth/logout`, {
+  const response = await apiFetch(`${API_URL}/auth/logout`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -45,7 +55,7 @@ export async function logoutRequest() {
 }
 
 export async function getUsersRequest() {
-  const response = await fetch(`${API_URL}/users`, {
+  const response = await apiFetch(`${API_URL}/users`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -63,7 +73,7 @@ export async function getUsersRequest() {
 
 
 export async function createUserRequest(userData) {
-  const response = await fetch(`${API_URL}/users`, {
+  const response = await apiFetch(`${API_URL}/users`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(userData),
@@ -79,7 +89,7 @@ export async function createUserRequest(userData) {
 }
 
 export async function getInstructorsRequest() {
-  const response = await fetch(`${API_URL}/instructors`, {
+  const response = await apiFetch(`${API_URL}/instructors`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -96,7 +106,7 @@ export async function getInstructorsRequest() {
 }
 
 export async function createInstructorRequest(instructorData) {
-  const response = await fetch(`${API_URL}/instructors`, {
+  const response = await apiFetch(`${API_URL}/instructors`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(instructorData),
@@ -112,7 +122,7 @@ export async function createInstructorRequest(instructorData) {
 }
 
 export async function getPlansRequest() {
-  const response = await fetch(`${API_URL}/plans`, {
+  const response = await apiFetch(`${API_URL}/plans`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -129,7 +139,7 @@ export async function getPlansRequest() {
 }
 
 export async function createPlanRequest(planData) {
-  const response = await fetch(`${API_URL}/plans`, {
+  const response = await apiFetch(`${API_URL}/plans`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(planData),
@@ -145,7 +155,7 @@ export async function createPlanRequest(planData) {
 }
 
 export async function getClassesRequest() {
-  const response = await fetch(`${API_URL}/classes`, {
+  const response = await apiFetch(`${API_URL}/classes`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -162,7 +172,7 @@ export async function getClassesRequest() {
 }
 
 export async function createClassRequest(classData) {
-  const response = await fetch(`${API_URL}/classes`, {
+  const response = await apiFetch(`${API_URL}/classes`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(classData),
@@ -178,7 +188,7 @@ export async function createClassRequest(classData) {
 }
 
 export async function updateUserRequest(id, userData) {
-  const response = await fetch(`${API_URL}/users/${id}`, {
+  const response = await apiFetch(`${API_URL}/users/${id}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify(userData),
@@ -194,7 +204,7 @@ export async function updateUserRequest(id, userData) {
 }
 
 export async function deleteUserRequest(id) {
-  const response = await fetch(`${API_URL}/users/${id}`, {
+  const response = await apiFetch(`${API_URL}/users/${id}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -211,7 +221,7 @@ export async function deleteUserRequest(id) {
 }
 
 export async function updateInstructorRequest(id, instructorData) {
-  const response = await fetch(`${API_URL}/instructors/${id}`, {
+  const response = await apiFetch(`${API_URL}/instructors/${id}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify(instructorData),
@@ -227,7 +237,7 @@ export async function updateInstructorRequest(id, instructorData) {
 }
 
 export async function deleteInstructorRequest(id) {
-  const response = await fetch(`${API_URL}/instructors/${id}`, {
+  const response = await apiFetch(`${API_URL}/instructors/${id}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -244,7 +254,7 @@ export async function deleteInstructorRequest(id) {
 }
 
 export async function updatePlanRequest(id, planData) {
-  const response = await fetch(`${API_URL}/plans/${id}`, {
+  const response = await apiFetch(`${API_URL}/plans/${id}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify(planData),
@@ -260,7 +270,7 @@ export async function updatePlanRequest(id, planData) {
 }
 
 export async function updateClassRequest(id, classData) {
-  const response = await fetch(`${API_URL}/classes/${id}`, {
+  const response = await apiFetch(`${API_URL}/classes/${id}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify(classData),
@@ -276,7 +286,7 @@ export async function updateClassRequest(id, classData) {
 }
 
 export async function deleteClassRequest(id) {
-  const response = await fetch(`${API_URL}/classes/${id}`, {
+  const response = await apiFetch(`${API_URL}/classes/${id}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -293,7 +303,7 @@ export async function deleteClassRequest(id) {
 }
 
 export async function updateUserPlanRequest(userId, planId) {
-  const response = await fetch(`${API_URL}/plans/user/${userId}`, {
+  const response = await apiFetch(`${API_URL}/plans/user/${userId}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ plan_id: planId }),
@@ -310,7 +320,7 @@ export async function updateUserPlanRequest(userId, planId) {
 
 // --- RUTAS DE RESERVAS ---
 export async function getUserBookingsRequest() {
-  const response = await fetch(`${API_URL}/bookings/my-bookings`, {
+  const response = await apiFetch(`${API_URL}/bookings/my-bookings`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -319,7 +329,7 @@ export async function getUserBookingsRequest() {
 }
 
 export async function createBookingRequest(bookingData) {
-  const response = await fetch(`${API_URL}/bookings`, {
+  const response = await apiFetch(`${API_URL}/bookings`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(bookingData),
@@ -330,7 +340,7 @@ export async function createBookingRequest(bookingData) {
 }
 
 export async function cancelBookingRequest(bookingId) {
-  const response = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
+  const response = await apiFetch(`${API_URL}/bookings/${bookingId}/cancel`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -340,7 +350,7 @@ export async function cancelBookingRequest(bookingId) {
 }
 
 export async function getMyMedicalCertificateRequest() {
-  const response = await fetch(`${API_URL}/medical-certificates/me`, {
+  const response = await apiFetch(`${API_URL}/medical-certificates/me`, {
     headers: getAuthHeaders(),
   });
 
@@ -350,7 +360,7 @@ export async function getMyMedicalCertificateRequest() {
 }
 
 export async function uploadMedicalCertificateRequest(filePayload) {
-  const response = await fetch(`${API_URL}/medical-certificates/me`, {
+  const response = await apiFetch(`${API_URL}/medical-certificates/me`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify(filePayload),
@@ -364,7 +374,7 @@ export async function uploadMedicalCertificateRequest(filePayload) {
 export async function getMedicalCertificatesRequest(status = "") {
   const query = status ? `?status=${status}` : "";
 
-  const response = await fetch(`${API_URL}/medical-certificates${query}`, {
+  const response = await apiFetch(`${API_URL}/medical-certificates${query}`, {
     headers: getAuthHeaders(),
   });
 
@@ -374,7 +384,7 @@ export async function getMedicalCertificatesRequest(status = "") {
 }
 
 export async function reviewMedicalCertificateRequest(id, status, rejection_reason = "") {
-  const response = await fetch(`${API_URL}/medical-certificates/${id}/review`, {
+  const response = await apiFetch(`${API_URL}/medical-certificates/${id}/review`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ status, rejection_reason }),
@@ -386,7 +396,7 @@ export async function reviewMedicalCertificateRequest(id, status, rejection_reas
 }
 
 export async function openMedicalCertificateFile(id) {
-  const response = await fetch(`${API_URL}/medical-certificates/${id}/file`, {
+  const response = await apiFetch(`${API_URL}/medical-certificates/${id}/file`, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
@@ -403,7 +413,7 @@ export async function openMedicalCertificateFile(id) {
 }
 
 export async function getClassStudentsRequest(classId) {
-  const response = await fetch(`${API_URL}/bookings/class/${classId}/students`, {
+  const response = await apiFetch(`${API_URL}/bookings/class/${classId}/students`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -412,7 +422,7 @@ export async function getClassStudentsRequest(classId) {
 }
 
 export async function reactivateUserRequest(id) {
-  const response = await fetch(`${API_URL}/users/${id}/reactivate`, {
+  const response = await apiFetch(`${API_URL}/users/${id}/reactivate`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -427,7 +437,7 @@ export async function reactivateUserRequest(id) {
 }
 
 export async function reactivateInstructorRequest(id) {
-  const response = await fetch(`${API_URL}/instructors/${id}/reactivate`, {
+  const response = await apiFetch(`${API_URL}/instructors/${id}/reactivate`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -442,7 +452,7 @@ export async function reactivateInstructorRequest(id) {
 }
 
 export async function deactivatePlanRequest(id) {
-  const response = await fetch(`${API_URL}/plans/${id}/deactivate`, {
+  const response = await apiFetch(`${API_URL}/plans/${id}/deactivate`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -457,7 +467,7 @@ export async function deactivatePlanRequest(id) {
 }
 
 export async function reactivatePlanRequest(id) {
-  const response = await fetch(`${API_URL}/plans/${id}/reactivate`, {
+  const response = await apiFetch(`${API_URL}/plans/${id}/reactivate`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -472,7 +482,7 @@ export async function reactivatePlanRequest(id) {
 }
 
 export async function removeMembershipRequest(userId) {
-  const response = await fetch(`${API_URL}/plans/user/${userId}/remove-membership`, {
+  const response = await apiFetch(`${API_URL}/plans/user/${userId}/remove-membership`, {
     method: "PUT",
     headers: getAuthHeaders(),
   });
@@ -488,7 +498,7 @@ export async function removeMembershipRequest(userId) {
 
 export async function getAttendanceOverviewRequest(dateFrom, dateTo) {
   const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-  const response = await fetch(`${API_URL}/attendance/statistics/overview?${params}`, {
+  const response = await apiFetch(`${API_URL}/attendance/statistics/overview?${params}`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -497,7 +507,7 @@ export async function getAttendanceOverviewRequest(dateFrom, dateTo) {
 }
 
 export async function getClassAttendanceRequest(classId) {
-  const response = await fetch(`${API_URL}/attendance/classes/${classId}`, {
+  const response = await apiFetch(`${API_URL}/attendance/classes/${classId}`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -506,7 +516,7 @@ export async function getClassAttendanceRequest(classId) {
 }
 
 export async function saveClassAttendanceRequest(classId, attendances) {
-  const response = await fetch(`${API_URL}/attendance/classes/${classId}`, {
+  const response = await apiFetch(`${API_URL}/attendance/classes/${classId}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ attendances }),
@@ -517,7 +527,7 @@ export async function saveClassAttendanceRequest(classId, attendances) {
 }
 
 export async function getClassAttendanceStatisticsRequest(classId) {
-  const response = await fetch(`${API_URL}/attendance/classes/${classId}/statistics`, {
+  const response = await apiFetch(`${API_URL}/attendance/classes/${classId}/statistics`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -526,14 +536,14 @@ export async function getClassAttendanceStatisticsRequest(classId) {
 }
 
 export async function getMyPaymentsRequest() {
-  const response = await fetch(`${API_URL}/payments/me`, { headers: getAuthHeaders() });
+  const response = await apiFetch(`${API_URL}/payments/me`, { headers: getAuthHeaders() });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Error al obtener los pagos");
   return data;
 }
 
 export async function createCheckoutRequest(planId) {
-  const response = await fetch(`${API_URL}/payments/checkout`, {
+  const response = await apiFetch(`${API_URL}/payments/checkout`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({ planId }),
@@ -542,8 +552,18 @@ export async function createCheckoutRequest(planId) {
   if (!response.ok) throw new Error(data.error || "Error al iniciar el pago");
   return data;
 }
+export async function reactivateClassRequest(id) {
+  const response = await apiFetch(`${API_URL}/classes/${id}/reactivate`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "Error al reactivar la clase");
+  return data;
+}
+
 export async function updateMyAvailabilityRequest(available_from, available_to) {
-  const response = await fetch(`${API_URL}/instructors/availability/me`, {
+  const response = await apiFetch(`${API_URL}/instructors/availability/me`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ available_from, available_to }),
@@ -554,7 +574,7 @@ export async function updateMyAvailabilityRequest(available_from, available_to) 
 }
 
 export async function getInstructorClassAttendanceRequest(classId) {
-  const response = await fetch(`${API_URL}/attendance/instructor/classes/${classId}`, {
+  const response = await apiFetch(`${API_URL}/attendance/instructor/classes/${classId}`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();
@@ -563,7 +583,7 @@ export async function getInstructorClassAttendanceRequest(classId) {
 }
 
 export async function saveInstructorClassAttendanceRequest(classId, attendances) {
-  const response = await fetch(`${API_URL}/attendance/instructor/classes/${classId}`, {
+  const response = await apiFetch(`${API_URL}/attendance/instructor/classes/${classId}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ attendances }),
@@ -580,7 +600,7 @@ export async function getAllPaymentsAdminRequest({ userId, status, dateFrom, dat
   if (dateFrom) params.set("date_from", dateFrom);
   if (dateTo) params.set("date_to", dateTo);
   const query = params.toString() ? `?${params}` : "";
-  const response = await fetch(`${API_URL}/payments/all${query}`, { headers: getAuthHeaders() });
+  const response = await apiFetch(`${API_URL}/payments/all${query}`, { headers: getAuthHeaders() });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Error al obtener los pagos");
   return data;
@@ -588,7 +608,7 @@ export async function getAllPaymentsAdminRequest({ userId, status, dateFrom, dat
 
 export async function getInstructorAttendanceHistoryRequest(dateFrom, dateTo) {
   const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
-  const response = await fetch(`${API_URL}/attendance/instructor/history?${params}`, {
+  const response = await apiFetch(`${API_URL}/attendance/instructor/history?${params}`, {
     headers: getAuthHeaders(),
   });
   const data = await response.json();

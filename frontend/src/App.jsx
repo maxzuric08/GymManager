@@ -4,6 +4,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import UserDashboard from "./pages/UserDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
+import SessionExpiredModal from "./components/SessionExpiredModal";
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
           }
         />
       </Routes>
+      <SessionExpiredModal />
     </BrowserRouter>
   );
 }

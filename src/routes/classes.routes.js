@@ -8,5 +8,6 @@ router.get("/",verifyToken, classController.getClasses);
 router.post("/",verifyToken, requireAdmin,classController.createClass);
 router.put("/:id", verifyToken, requireAdmin, classController.updateClass);
 router.delete("/:id", verifyToken, requireAdmin, classController.deleteClass);
+router.put("/:id/reactivate", verifyToken, requireAdmin, classController.reactivateClass);
 
 module.exports = router;

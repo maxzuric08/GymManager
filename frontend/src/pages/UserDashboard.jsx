@@ -526,7 +526,7 @@ export default function UserDashboard() {
                         <td style={styles.ptd}>{p.plan_type || "-"}</td>
                         <td style={styles.ptd}>${Number(p.amount).toLocaleString("es-AR")}</td>
                         <td style={styles.ptd}>{p.payment_date ? new Date(p.payment_date).toLocaleDateString("es-AR") : "-"}</td>
-                        <td style={styles.ptd}>{p.expiry_date ? new Date(`${p.expiry_date}T00:00:00`).toLocaleDateString("es-AR") : "-"}</td>
+                        <td style={styles.ptd}>{p.expiry_date ? new Date(p.expiry_date).toLocaleDateString("es-AR") : "-"}</td>
                         <td style={styles.ptd}>{p.payment_method || "-"}</td>
                         <td style={styles.ptd}>
                           <span style={{

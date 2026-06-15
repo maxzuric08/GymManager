@@ -25,7 +25,8 @@ const formatInputDate = (date) => {
 
 const formatDate = (iso) => {
   if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("es-AR");
+  const d = new Date(iso.includes("T") ? iso : `${iso}T00:00:00`);
+  return isNaN(d) ? "-" : d.toLocaleDateString("es-AR");
 };
 
 const formatAmount = (amount) => {
