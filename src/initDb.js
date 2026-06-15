@@ -63,6 +63,12 @@ const initializeDatabase = async () => {
     `);
     console.log("Attendance instructor marker added");
 
+    await pool.query(`
+      ALTER TABLE payments
+      ADD COLUMN IF NOT EXISTS checkout_url TEXT;
+    `);
+    console.log("Payment checkout URL added");
+
     // Create index for better query performance
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_medical_certificates_user_id

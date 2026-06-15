@@ -230,6 +230,13 @@ export default function UserDashboard() {
     approved: "Aprobado",
     rejected: "Rechazado",
   };
+  const paymentStatusText = {
+    approved: "Aprobado",
+    pending: "Pendiente",
+    rejected: "Rechazado",
+    cancelled: "Cancelado",
+    error: "Error",
+  };
 
   return (
       <div style={styles.container}>
@@ -524,10 +531,22 @@ export default function UserDashboard() {
                         <td style={styles.ptd}>
                           <span style={{
                             padding: "3px 10px", borderRadius: "12px", fontSize: "0.8rem", fontWeight: "bold",
-                            backgroundColor: p.payment_status === "approved" ? "#dcfce7" : p.payment_status === "pending" ? "#fef9c3" : "#fee2e2",
-                            color: p.payment_status === "approved" ? "#15803d" : p.payment_status === "pending" ? "#854d0e" : "#b91c1c",
+                            backgroundColor: p.payment_status === "approved"
+                              ? "#dcfce7"
+                              : p.payment_status === "pending"
+                                ? "#fef9c3"
+                                : p.payment_status === "cancelled"
+                                  ? "#e2e8f0"
+                                  : "#fee2e2",
+                            color: p.payment_status === "approved"
+                              ? "#15803d"
+                              : p.payment_status === "pending"
+                                ? "#854d0e"
+                                : p.payment_status === "cancelled"
+                                  ? "#475569"
+                                  : "#b91c1c",
                           }}>
-                            {p.payment_status === "approved" ? "Aprobado" : p.payment_status === "pending" ? "Pendiente" : p.payment_status === "rejected" ? "Rechazado" : p.payment_status}
+                            {paymentStatusText[p.payment_status] || p.payment_status}
                           </span>
                         </td>
                       </tr>

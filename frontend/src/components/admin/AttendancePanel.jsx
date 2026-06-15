@@ -12,7 +12,17 @@ const STATUS_OPTIONS = [
   { value: "excused", label: "Justificado" },
 ];
 
-const formatInputDate = (date) => date.toISOString().slice(0, 10);
+const formatInputDate = (date) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+};
+
+const getClassDate = (value) => value?.slice(0, 10) || "";
+
+const formatClassDate = (value) => {
+  const date = getClassDate(value);
+  return date ? new Date(`${date}T00:00:00`).toLocaleDateString("es-AR") : "-";
+};
 
 export default function AttendancePanel() {
   const [dateFrom, setDateFrom] = useState(() => {
@@ -53,7 +63,7 @@ export default function AttendancePanel() {
       setStudents(
         data.students.map((student) => ({
           ...student,
-          attendance_status: student.attendance_status || "present",
+          attendance_status: student.attendance_status || "",
           notes: student.notes || "",
         }))
       );
@@ -74,6 +84,11 @@ export default function AttendancePanel() {
 
   const saveAttendance = async () => {
     if (!selectedClass || students.length === 0) return;
+    if (students.some((student) => !student.attendance_status)) {
+      setError("Seleccioná el estado de asistencia de todos los alumnos.");
+      setMessage("");
+      return;
+    }
 
     setSaving(true);
     try {
@@ -147,19 +162,23 @@ export default function AttendancePanel() {
           </thead>
           <tbody>
             {!loading && overview.classes.length === 0 && (
-              <tr><td colSpan="9" style={styles.empty}>No hay clases en el periodo.</td></tr>
+              <tr><td colSpan="10" style={styles.empty}>No hay clases en el periodo.</td></tr>
             )}
             {overview.classes.map((gymClass) => (
               <tr key={gymClass.class_id}>
                 <td style={styles.td}><strong>{gymClass.class_name}</strong></td>
-                <td style={styles.td}>{new Date(gymClass.class_date).toLocaleDateString("es-AR")}</td>
+                <td style={styles.td}>{formatClassDate(gymClass.class_date)}</td>
                 <td style={styles.td}>{gymClass.instructor_name}</td>
                 <td style={styles.td}>{gymClass.booked}</td>
                 <td style={styles.td}>{gymClass.present}</td>
                 <td style={styles.td}>{gymClass.absent}</td>
                 <td style={styles.td}>{gymClass.late}</td>
                 <td style={styles.td}>{gymClass.excused}</td>
-                <td style={styles.td}>{gymClass.attendance_rate}%</td>
+                <td style={styles.td}>
+                  {gymClass.attendance_registered > 0
+                    ? `${gymClass.attendance_rate}%`
+                    : <span style={styles.notRegistered}>Sin registrar</span>}
+                </td>
                 <td style={styles.td}>
                   <button onClick={() => openClass(gymClass.class_id)} style={styles.actionBtn}>
                     Gestionar
@@ -179,7 +198,7 @@ export default function AttendancePanel() {
               <div>
                 <h3 style={styles.modalTitle}>{selectedClass.class_name}</h3>
                 <p style={styles.subtitle}>
-                  {new Date(selectedClass.class_date).toLocaleDateString("es-AR")} · {selectedClass.start_time?.slice(0, 5)}
+                  {formatClassDate(selectedClass.class_date)} · {selectedClass.start_time?.slice(0, 5)}
                 </p>
               </div>
               <button onClick={() => setSelectedClass(null)} style={styles.closeBtn} aria-label="Cerrar">×</button>
@@ -200,6 +219,7 @@ export default function AttendancePanel() {
                       onChange={(e) => updateStudent(student.booking_id, "attendance_status", e.target.value)}
                       style={styles.statusSelect}
                     >
+                      <option value="">Seleccionar</option>
                       {STATUS_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>{option.label}</option>
                       ))}
@@ -256,6 +276,7 @@ const styles = {
   actionBtn: { border: 0, borderRadius: "6px", padding: "8px 11px", background: "#2563eb", color: "white", fontWeight: 700, cursor: "pointer" },
   error: { padding: "10px", background: "#fee2e2", color: "#991b1b", borderRadius: "6px" },
   success: { padding: "10px", background: "#dcfce7", color: "#166534", borderRadius: "6px" },
+  notRegistered: { color: "#94a3b8", fontWeight: 700, whiteSpace: "nowrap" },
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(15,23,42,0.55)", display: "grid", placeItems: "center", padding: "20px", zIndex: 1000 },
   modal: { width: "min(900px, 100%)", maxHeight: "88vh", overflow: "auto", background: "white", borderRadius: "8px", padding: "20px", boxShadow: "0 24px 60px rgba(15,23,42,0.25)" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" },

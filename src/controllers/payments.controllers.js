@@ -44,30 +44,79 @@ const getMyPayments = async (req, res) => {
 };
 
 const createCheckout = async (req, res) => {
-  let localPaymentId;
+  const client = await pool.connect();
   try {
     const { planId } = req.body;
     if (!planId) return res.status(400).json({ error: "Debes seleccionar un plan" });
-    if (!process.env.MP_ACCESS_TOKEN || !process.env.FRONTEND_URL || !process.env.BACKEND_PUBLIC_URL) {
+    if (
+      !process.env.MP_ACCESS_TOKEN
+      || !process.env.MP_WEBHOOK_SECRET
+      || !process.env.FRONTEND_URL
+      || !process.env.BACKEND_PUBLIC_URL
+    ) {
       return res.status(503).json({ error: "Falta configurar Mercado Pago en el archivo .env" });
     }
 
-    const [userResult, planResult] = await Promise.all([
-      pool.query("SELECT user_id FROM users WHERE user_id = $1 AND user_status = 'active'", [req.user.id]),
-      pool.query("SELECT * FROM plans WHERE plan_id = $1 AND status = 'active'", [planId]),
-    ]);
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1, $2)", [7412, req.user.id]);
 
-    if (!userResult.rows[0]) return res.status(404).json({ error: "Usuario no encontrado" });
-    if (!planResult.rows[0]) return res.status(404).json({ error: "Plan no encontrado o inactivo" });
+    const userResult = await client.query(
+      "SELECT user_id FROM users WHERE user_id = $1 AND user_status = 'active'",
+      [req.user.id]
+    );
+    const planResult = await client.query(
+      "SELECT * FROM plans WHERE plan_id = $1 AND status = 'active'",
+      [planId]
+    );
+
+    if (!userResult.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    if (!planResult.rows[0]) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Plan no encontrado o inactivo" });
+    }
 
     const plan = planResult.rows[0];
-    const inserted = await pool.query(
+    const existingPending = await client.query(
+      `SELECT payment_id, checkout_url
+         FROM payments
+        WHERE user_id = $1
+          AND plan_id = $2
+          AND payment_status = 'pending'
+          AND checkout_url IS NOT NULL
+        ORDER BY payment_date DESC
+        LIMIT 1`,
+      [req.user.id, plan.plan_id]
+    );
+
+    if (existingPending.rows[0]) {
+      await client.query("COMMIT");
+      return res.status(200).json({
+        message: "Ya existe un pago pendiente para este plan",
+        checkoutUrl: existingPending.rows[0].checkout_url,
+        reused: true,
+      });
+    }
+
+    await client.query(
+      `UPDATE payments
+          SET payment_status = 'cancelled',
+              status_detail = 'Reemplazado por un nuevo intento de pago'
+        WHERE user_id = $1
+          AND payment_status = 'pending'
+          AND checkout_url IS NULL`,
+      [req.user.id]
+    );
+
+    const inserted = await client.query(
       `INSERT INTO payments (user_id, plan_id, amount, payment_status, payment_method, currency)
        VALUES ($1, $2, $3, 'pending', 'mercadopago', 'ARS')
        RETURNING payment_id`,
       [req.user.id, plan.plan_id, plan.cost]
     );
-    localPaymentId = inserted.rows[0].payment_id;
+    const localPaymentId = inserted.rows[0].payment_id;
     const externalReference = `gym-payment-${localPaymentId}`;
 
     const preference = await mercadoPago.createPreference(
@@ -92,25 +141,30 @@ const createCheckout = async (req, res) => {
       externalReference
     );
 
-    await pool.query(
-      `UPDATE payments SET preference_id = $1, external_reference = $2 WHERE payment_id = $3`,
-      [preference.id, externalReference, localPaymentId]
-    );
-
     const isTest = process.env.MP_ACCESS_TOKEN.startsWith("TEST-");
+    const checkoutUrl = isTest ? preference.sandbox_init_point : preference.init_point;
+    if (!preference.id || !checkoutUrl) {
+      throw new Error("Mercado Pago no devolvio una preferencia valida");
+    }
+
+    await client.query(
+      `UPDATE payments
+          SET preference_id = $1, external_reference = $2, checkout_url = $3
+        WHERE payment_id = $4`,
+      [preference.id, externalReference, checkoutUrl, localPaymentId]
+    );
+    await client.query("COMMIT");
+
     res.status(201).json({
       message: "Pago creado",
-      checkoutUrl: isTest ? preference.sandbox_init_point : preference.init_point,
+      checkoutUrl,
     });
   } catch (error) {
-    if (localPaymentId) {
-      await pool.query(
-        "UPDATE payments SET payment_status = 'error', status_detail = $1 WHERE payment_id = $2",
-        [error.message, localPaymentId]
-      ).catch(() => {});
-    }
+    await client.query("ROLLBACK").catch(() => {});
     console.error("Error al crear checkout:", error);
     res.status(500).json({ error: error.message || "Error al iniciar el pago" });
+  } finally {
+    client.release();
   }
 };
 
@@ -122,9 +176,12 @@ const processPayment = async (paymentId) => {
   try {
     await client.query("BEGIN");
     const localResult = await client.query(
-      `SELECT pay.*, p.duration_value, p.duration_unit, p.cost
+      `SELECT pay.*, p.duration_value, p.duration_unit, p.cost,
+              u.plan_id AS current_plan_id,
+              u.plan_expiration_date AS current_plan_expiration_date
          FROM payments pay
          JOIN plans p ON p.plan_id = pay.plan_id
+         JOIN users u ON u.user_id = pay.user_id
         WHERE pay.external_reference = $1
         FOR UPDATE`,
       [payment.external_reference]
@@ -151,7 +208,24 @@ const processPayment = async (paymentId) => {
 
     if (payment.status === "approved" && !localPayment.processed_at) {
       if (!validAmount || !validCurrency) throw new Error("El monto o moneda del pago no coinciden");
-      const expirationDate = calculateExpirationDate(localPayment, payment.date_approved ? new Date(payment.date_approved) : new Date());
+      const approvedDate = payment.date_approved ? new Date(payment.date_approved) : new Date();
+      let membershipStart = approvedDate;
+
+      if (
+        Number(localPayment.current_plan_id) === Number(localPayment.plan_id)
+        && localPayment.current_plan_expiration_date
+      ) {
+        const currentExpirationValue = localPayment.current_plan_expiration_date;
+        const currentExpirationDate = currentExpirationValue instanceof Date
+          ? currentExpirationValue.toISOString().slice(0, 10)
+          : String(currentExpirationValue).slice(0, 10);
+        const currentExpiration = new Date(
+          `${currentExpirationDate}T00:00:00Z`
+        );
+        if (currentExpiration > approvedDate) membershipStart = currentExpiration;
+      }
+
+      const expirationDate = calculateExpirationDate(localPayment, membershipStart);
 
       await client.query(
         "UPDATE users SET plan_id = $1, plan_expiration_date = $2 WHERE user_id = $3",
@@ -201,6 +275,9 @@ const webhook = async (req, res) => {
     res.sendStatus(200);
   } catch (error) {
     console.error("Error procesando webhook de pago:", error);
+    if (mercadoPago.isInvalidWebhookSignature(error)) {
+      return res.status(401).json({ error: "Firma de webhook invalida" });
+    }
     res.status(500).json({ error: "No se pudo procesar la notificacion" });
   }
 };
@@ -239,7 +316,9 @@ const getAllPayments = async (req, res) => {
            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_status = 'approved'), 0)::numeric AS total_approved_amount,
            COUNT(*) FILTER (WHERE pay.payment_status = 'approved')::int AS approved,
            COUNT(*) FILTER (WHERE pay.payment_status = 'pending')::int AS pending,
-           COUNT(*) FILTER (WHERE pay.payment_status = 'rejected')::int AS rejected
+           COUNT(*) FILTER (WHERE pay.payment_status = 'rejected')::int AS rejected,
+           COUNT(*) FILTER (WHERE pay.payment_status = 'cancelled')::int AS cancelled,
+           COUNT(*) FILTER (WHERE pay.payment_status = 'error')::int AS errors
            FROM payments pay
            LEFT JOIN users u ON u.user_id = pay.user_id
            LEFT JOIN plans p ON p.plan_id = pay.plan_id

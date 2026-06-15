@@ -69,10 +69,34 @@ const saveClassAttendance = async (req, res) => {
 
         await client.query("BEGIN");
 
-        const classResult = await client.query("SELECT class_id FROM classes WHERE class_id = $1", [classId]);
+        const classResult = await client.query(
+            `SELECT class_id, class_date, start_time, status
+               FROM classes
+              WHERE class_id = $1
+              FOR UPDATE`,
+            [classId]
+        );
         if (classResult.rows.length === 0) {
             await client.query("ROLLBACK");
             return res.status(404).json({ error: "Clase no encontrada" });
+        }
+
+        const gymClass = classResult.rows[0];
+        if (!["active", "scheduled"].includes(gymClass.status)) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({ error: "No se puede registrar asistencia en una clase cancelada o inactiva" });
+        }
+
+        const availability = await client.query(
+            `SELECT (
+                $1::date < CURRENT_DATE
+                OR ($1::date = CURRENT_DATE AND $2::time <= LOCALTIME)
+            ) AS available`,
+            [gymClass.class_date, gymClass.start_time]
+        );
+        if (!availability.rows[0].available) {
+            await client.query("ROLLBACK");
+            return res.status(403).json({ error: "La asistencia se habilita cuando comienza la clase" });
         }
 
         const bookingsResult = await client.query(
@@ -130,9 +154,10 @@ const getClassAttendanceStatistics = async (req, res) => {
                     COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'absent')::integer AS absent,
                     COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'late')::integer AS late,
                     COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'excused')::integer AS excused,
-                    ROUND(CASE WHEN COUNT(DISTINCT b.booking_id) = 0 THEN 0
+                    COUNT(DISTINCT a.attendance_id)::integer AS attendance_registered,
+                    ROUND(CASE WHEN COUNT(DISTINCT a.attendance_id) = 0 THEN 0
                          ELSE 100.0 * COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status IN ('present', 'late'))
-                              / COUNT(DISTINCT b.booking_id) END, 2) AS attendance_rate,
+                              / COUNT(DISTINCT a.attendance_id) END, 2) AS attendance_rate,
                     ROUND(CASE WHEN COALESCE(c.capacity, 0) = 0 THEN 0
                          ELSE 100.0 * COUNT(DISTINCT b.booking_id) / c.capacity END, 2) AS occupancy_rate
              FROM classes c
@@ -181,9 +206,10 @@ const getAttendanceOverview = async (req, res) => {
                     COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'absent')::integer AS absent,
                     COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'late')::integer AS late,
                     COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status = 'excused')::integer AS excused,
-                    ROUND(CASE WHEN COUNT(DISTINCT b.booking_id) = 0 THEN 0
+                    COUNT(DISTINCT a.attendance_id)::integer AS attendance_registered,
+                    ROUND(CASE WHEN COUNT(DISTINCT a.attendance_id) = 0 THEN 0
                          ELSE 100.0 * COUNT(DISTINCT b.booking_id) FILTER (WHERE a.status IN ('present', 'late'))
-                              / COUNT(DISTINCT b.booking_id) END, 2) AS attendance_rate,
+                              / COUNT(DISTINCT a.attendance_id) END, 2) AS attendance_rate,
                     ROUND(CASE WHEN COALESCE(c.capacity, 0) = 0 THEN 0
                          ELSE 100.0 * COUNT(DISTINCT b.booking_id) / c.capacity END, 2) AS occupancy_rate
              FROM classes c
@@ -191,6 +217,11 @@ const getAttendanceOverview = async (req, res) => {
              LEFT JOIN bookings b ON b.class_id = c.class_id AND b.status = 'confirmed'
              LEFT JOIN attendance a ON a.booking_id = b.booking_id
              WHERE c.class_date BETWEEN $1 AND $2
+               AND c.status NOT IN ('cancelled', 'inactive')
+               AND (
+                   c.class_date < CURRENT_DATE
+                   OR (c.class_date = CURRENT_DATE AND c.start_time <= LOCALTIME)
+               )
              GROUP BY c.class_id, i.instructor_id
              ORDER BY c.class_date DESC, c.start_time DESC`,
             [from, to]
@@ -204,13 +235,14 @@ const getAttendanceOverview = async (req, res) => {
                 absent: totals.absent + item.absent,
                 late: totals.late + item.late,
                 excused: totals.excused + item.excused,
+                attendance_registered: totals.attendance_registered + item.attendance_registered,
                 capacity: totals.capacity + (item.capacity || 0)
             }),
-            { classes: 0, booked: 0, present: 0, absent: 0, late: 0, excused: 0, capacity: 0 }
+            { classes: 0, booked: 0, present: 0, absent: 0, late: 0, excused: 0, attendance_registered: 0, capacity: 0 }
         );
 
-        summary.attendance_rate = summary.booked
-            ? Number((((summary.present + summary.late) * 100) / summary.booked).toFixed(2))
+        summary.attendance_rate = summary.attendance_registered
+            ? Number((((summary.present + summary.late) * 100) / summary.attendance_registered).toFixed(2))
             : 0;
         summary.occupancy_rate = summary.capacity
             ? Number(((summary.booked * 100) / summary.capacity).toFixed(2))

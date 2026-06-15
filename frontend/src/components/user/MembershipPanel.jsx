@@ -2,7 +2,19 @@
 import { createCheckoutRequest, getMyPaymentsRequest } from "../../services/api";
 
 const money = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
-const formatDate = (value) => value ? new Date(value).toLocaleDateString("es-AR") : "Sin fecha informada";
+const PAYMENT_STATUS_LABELS = {
+  approved: "Aprobado",
+  pending: "Pendiente",
+  rejected: "Rechazado",
+  cancelled: "Cancelado",
+  error: "Error",
+};
+
+const formatDate = (value) => {
+  if (!value) return "Sin fecha informada";
+  const normalized = String(value).slice(0, 10);
+  return new Date(`${normalized}T00:00:00`).toLocaleDateString("es-AR");
+};
 
 export default function MembershipPanel({ plans, currentUser, onMembershipUpdated }) {
   const [data, setData] = useState(null);
@@ -84,7 +96,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
                   <td style={styles.cell}>{formatDate(payment.payment_date)}</td>
                   <td style={styles.cell}>{payment.plan_type || "-"}</td>
                   <td style={styles.cell}>{money.format(payment.amount)}</td>
-                  <td style={styles.cell}>{payment.payment_status}</td>
+                  <td style={styles.cell}>{PAYMENT_STATUS_LABELS[payment.payment_status] || payment.payment_status}</td>
                 </tr>
               ))}</tbody>
             </table>

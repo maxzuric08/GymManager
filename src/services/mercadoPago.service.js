@@ -1,5 +1,7 @@
 ﻿const { MercadoPagoConfig, Payment, Preference, WebhookSignatureValidator } = require("mercadopago");
 
+const { InvalidWebhookSignatureError } = require("mercadopago");
+
 const getClient = () => {
   if (!process.env.MP_ACCESS_TOKEN) throw new Error("Falta configurar MP_ACCESS_TOKEN");
   return new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN, options: { timeout: 10000 } });
@@ -16,7 +18,9 @@ const getPayment = async (id) => {
 };
 
 const validateWebhookSignature = (req) => {
-  if (!process.env.MP_WEBHOOK_SECRET) return;
+  if (!process.env.MP_WEBHOOK_SECRET) {
+    throw new Error("Falta configurar MP_WEBHOOK_SECRET");
+  }
   WebhookSignatureValidator.validate({
     xSignature: req.headers["x-signature"],
     xRequestId: req.headers["x-request-id"],
@@ -26,4 +30,11 @@ const validateWebhookSignature = (req) => {
   });
 };
 
-module.exports = { createPreference, getPayment, validateWebhookSignature };
+const isInvalidWebhookSignature = (error) => error instanceof InvalidWebhookSignatureError;
+
+module.exports = {
+  createPreference,
+  getPayment,
+  validateWebhookSignature,
+  isInvalidWebhookSignature,
+};

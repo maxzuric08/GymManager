@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS payments (
     corresponding_month VARCHAR(20),
     mp_payment_id VARCHAR(255) UNIQUE,
     preference_id VARCHAR(255),
+    checkout_url TEXT,
     external_reference VARCHAR(100),
     status_detail VARCHAR(100),
     currency VARCHAR(10) DEFAULT 'ARS',
@@ -161,6 +162,7 @@ CREATE TABLE IF NOT EXISTS payments (
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS plan_id INTEGER REFERENCES plans(plan_id);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS mp_payment_id VARCHAR(255);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS preference_id VARCHAR(255);
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS checkout_url TEXT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS external_reference VARCHAR(100);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS status_detail VARCHAR(100);
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'ARS';

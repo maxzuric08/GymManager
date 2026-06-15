@@ -6,16 +6,22 @@ const STATUS_OPTIONS = [
   { value: "approved", label: "Aprobado" },
   { value: "pending", label: "Pendiente" },
   { value: "rejected", label: "Rechazado" },
+  { value: "cancelled", label: "Cancelado" },
+  { value: "error", label: "Error" },
 ];
 
 const STATUS_LABELS = {
   approved: { label: "Aprobado", color: "#15803d", bg: "#dcfce7" },
   pending:  { label: "Pendiente", color: "#92400e", bg: "#fef3c7" },
   rejected: { label: "Rechazado", color: "#991b1b", bg: "#fee2e2" },
+  cancelled:{ label: "Cancelado", color: "#475569", bg: "#e2e8f0" },
   error:    { label: "Error",     color: "#991b1b", bg: "#fee2e2" },
 };
 
-const formatInputDate = (date) => date.toISOString().slice(0, 10);
+const formatInputDate = (date) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+};
 
 const formatDate = (iso) => {
   if (!iso) return "-";
@@ -102,6 +108,8 @@ export default function PaymentsPanel() {
         <Metric label="Aprobados"    value={stats.approved || 0}  accent="#15803d" />
         <Metric label="Pendientes"   value={stats.pending || 0}   accent="#92400e" />
         <Metric label="Rechazados"   value={stats.rejected || 0}  accent="#b91c1c" />
+        <Metric label="Cancelados"   value={stats.cancelled || 0} accent="#475569" />
+        <Metric label="Errores"      value={stats.errors || 0}    accent="#b91c1c" />
         <Metric label="Recaudado"    value={formatAmount(stats.total_approved_amount)} accent="#1d4ed8" />
       </div>
 
