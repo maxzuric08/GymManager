@@ -108,28 +108,6 @@ const updatePlan =  async (req, res) => {
     }
 };
 
-const deletePlan = async (req, res) => {
-    try {
-        const { id } = req.params;
-
-        const result = await pool.query(
-            "DELETE FROM plans WHERE plan_id = $1 RETURNING *",
-            [id]
-        );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Plan no encontrado" });
-        }
-
-        res.json({ message: "Plan eliminado", plan: result.rows[0] });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error al eliminar plan" });
-    }
-};
-
-
-
 const updateUserPlan = async (req, res) => {
   try {
     const { id } = req.params;
@@ -265,7 +243,6 @@ module.exports = {
     getPlans,
     createPlan,
     updatePlan,
-    deletePlan,
     updateUserPlan,
     deactivatePlan,
     removeMembership,

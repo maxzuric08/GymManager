@@ -15,7 +15,12 @@ const getUserBookings = async (req, res) => {
              FROM bookings b
              JOIN classes c ON b.class_id = c.class_id
              LEFT JOIN instructors i ON c.instructor_id = i.instructor_id
-             WHERE b.user_id = $1 AND b.status = 'confirmed'
+             WHERE b.user_id = $1
+               AND b.status = 'confirmed'
+               AND (
+                   c.class_date > CURRENT_DATE OR
+                   (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+               )
              ORDER BY c.class_date ASC, c.start_time ASC`,
             [req.user.id]
         );
@@ -43,10 +48,12 @@ const createBooking = async (req, res) => {
             `SELECT u.user_status,
                     u.plan_id,
                     u.plan_expiration_date,
-                    p.status AS plan_status
+                    p.status AS plan_status,
+                    p.class_limit
              FROM users u
              LEFT JOIN plans p ON u.plan_id = p.plan_id
-             WHERE u.user_id = $1`,
+             WHERE u.user_id = $1
+             FOR UPDATE OF u`,
             [req.user.id]
         );
 
@@ -90,7 +97,7 @@ const createBooking = async (req, res) => {
         }
 
         const classResult = await client.query(
-            `SELECT class_id, capacity, class_date, start_time, status
+            `SELECT class_id, capacity, class_date, start_time, end_time, status
              FROM classes
              WHERE class_id = $1
              FOR UPDATE`,
@@ -132,6 +139,50 @@ const createBooking = async (req, res) => {
             return res.status(400).json({ error: "Ya tenes una reserva para esta clase" });
         }
 
+        const overlappingBooking = await client.query(
+            `SELECT b.booking_id, c.class_name, c.start_time, c.end_time
+               FROM bookings b
+               JOIN classes c ON c.class_id = b.class_id
+              WHERE b.user_id = $1
+                AND b.status = 'confirmed'
+                AND c.class_date = $2
+                AND c.status IN ('active', 'scheduled')
+                AND c.start_time < $4
+                AND c.end_time > $3
+              LIMIT 1`,
+            [req.user.id, gymClass.class_date, gymClass.start_time, gymClass.end_time]
+        );
+
+        if (overlappingBooking.rows.length > 0) {
+            const conflict = overlappingBooking.rows[0];
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+                error: `Ya tenes una reserva que se superpone: ${conflict.class_name} de ${conflict.start_time.slice(0, 5)} a ${conflict.end_time.slice(0, 5)}`,
+            });
+        }
+
+        if (user.class_limit !== null) {
+            const activeBookings = await client.query(
+                `SELECT COUNT(*)::integer AS total
+                   FROM bookings b
+                   JOIN classes c ON c.class_id = b.class_id
+                  WHERE b.user_id = $1
+                    AND b.status = 'confirmed'
+                    AND (
+                        c.class_date > CURRENT_DATE OR
+                        (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+                    )`,
+                [req.user.id]
+            );
+
+            if (activeBookings.rows[0].total >= Number(user.class_limit)) {
+                await client.query("ROLLBACK");
+                return res.status(409).json({
+                    error: `Tu plan permite hasta ${user.class_limit} reservas futuras activas`,
+                });
+            }
+        }
+
         const occupancyResult = await client.query(
             `SELECT COUNT(*)::integer AS booked
              FROM bookings
@@ -168,12 +219,36 @@ const cancelBooking = async (req, res) => {
         const result = await pool.query(
             `UPDATE bookings
              SET status = 'cancelled'
-             WHERE booking_id = $1 AND user_id = $2 AND status = 'confirmed'
+             WHERE booking_id = $1
+               AND user_id = $2
+               AND status = 'confirmed'
+               AND EXISTS (
+                   SELECT 1
+                     FROM classes c
+                    WHERE c.class_id = bookings.class_id
+                      AND (
+                          c.class_date > CURRENT_DATE OR
+                          (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+                      )
+               )
              RETURNING booking_id, user_id, class_id, booking_date, status`,
             [id, req.user.id]
         );
 
         if (result.rows.length === 0) {
+            const booking = await pool.query(
+                `SELECT b.booking_id,
+                        (c.class_date > CURRENT_DATE OR
+                         (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)) AS can_cancel
+                   FROM bookings b
+                   JOIN classes c ON c.class_id = b.class_id
+                  WHERE b.booking_id = $1 AND b.user_id = $2 AND b.status = 'confirmed'`,
+                [id, req.user.id]
+            );
+
+            if (booking.rows[0] && !booking.rows[0].can_cancel) {
+                return res.status(409).json({ error: "No podes cancelar una clase que ya comenzo" });
+            }
             return res.status(404).json({ error: "Reserva no encontrada o no te pertenece" });
         }
 

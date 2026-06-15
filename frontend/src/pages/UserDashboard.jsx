@@ -34,6 +34,7 @@ export default function UserDashboard() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [bookingClassId, setBookingClassId] = useState(null);
 
   const [confirmModal, setConfirmModal] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -56,19 +57,18 @@ export default function UserDashboard() {
             getUserBookingsRequest(),
           ]);
 
-      console.log("Plans data from API:", plansData);
       const filteredPlans = plansData.filter((p) => p.status === "active");
-      console.log("Filtered plans:", filteredPlans);
       setPlans(filteredPlans);
 
-      const today = new Date().toISOString().split("T")[0];
       const filteredClasses = classesData.filter(
-          (c) => c.class_date >= today && c.status !== "cancelled"
+          (gymClass) => {
+            if (!["active", "scheduled"].includes(gymClass.status)) return false;
+            const classDate = gymClass.class_date.slice(0, 10);
+            const start = new Date(`${classDate}T${gymClass.start_time}`);
+            return start > new Date();
+          }
       );
-      console.log("Filtered classes:", filteredClasses);
       setClasses(filteredClasses);
-
-      console.log("Bookings data:", bookingsData);
 
       setMyBookings(bookingsData);
       setError("");
@@ -76,7 +76,6 @@ export default function UserDashboard() {
       // Fetch medical certificate separately so it doesn't break other data
       try {
         const certificateData = await getMyMedicalCertificateRequest();
-        console.log("Medical certificate data:", certificateData);
         setMedicalCertificate(certificateData);
       } catch (certErr) {
         console.error("Error fetching medical certificate:", certErr);
@@ -108,6 +107,7 @@ export default function UserDashboard() {
   };
 
   const handleBookClass = async (classId) => {
+    if (bookingClassId !== null) return;
     clearMessages();
 
     if (!currentUser.plan_id) {
@@ -123,13 +123,16 @@ export default function UserDashboard() {
     }
 
     try {
+      setBookingClassId(classId);
       await createBookingRequest({ class_id: classId });
       setMessage("Reserva confirmada con éxito.");
       setError("");
-      fetchData();
+      await fetchData();
     } catch (err) {
       setError(err.message);
       setMessage("");
+    } finally {
+      setBookingClassId(null);
     }
   };
 
@@ -335,6 +338,8 @@ export default function UserDashboard() {
                   const isBooked = myBookings.some(
                       (booking) => booking.class_id === cls.class_id
                   );
+                  const isBooking = bookingClassId === cls.class_id;
+                  const bookingInProgress = bookingClassId !== null;
 
                   return (
                       <div key={cls.class_id} style={styles.card}>
@@ -350,14 +355,14 @@ export default function UserDashboard() {
 
                         <button
                             onClick={() => handleBookClass(cls.class_id)}
-                            disabled={isBooked}
+                            disabled={isBooked || bookingInProgress}
                             style={{
                               ...styles.button,
-                              background: isBooked ? "#94a3b8" : "#2563eb",
-                              cursor: isBooked ? "not-allowed" : "pointer",
+                              background: (isBooked || bookingInProgress) ? "#94a3b8" : "#2563eb",
+                              cursor: (isBooked || bookingInProgress) ? "not-allowed" : "pointer",
                             }}
                         >
-                          {isBooked ? "Ya estas anotado" : "Reservar Lugar"}
+                          {isBooked ? "Ya estas anotado" : isBooking ? "Reservando..." : "Reservar Lugar"}
                         </button>
                       </div>
                   );

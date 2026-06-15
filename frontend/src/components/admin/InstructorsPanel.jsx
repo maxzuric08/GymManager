@@ -169,16 +169,16 @@ export default function InstructorsPanel() {
                <input name="birth_date" type="date" max={new Date().toISOString().split("T")[0]} value={formData.birth_date || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent", color: "#1e293b" }} />
             </div>
 
-            <input name="branch_id" type="number" placeholder="ID Sucursal" value={formData.branch_id || ""} onChange={handleInputChange} style={styles.input} />
+            <input name="branch_id" type="number" min="1" required placeholder="ID Sucursal" value={formData.branch_id || ""} onChange={handleInputChange} style={styles.input} />
 
             <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
                <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Desde</span>
-               <input name="available_from" type="time" value={formData.available_from || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
+               <input name="available_from" type="time" required value={formData.available_from || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
                <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Hasta</span>
-               <input name="available_to" type="time" value={formData.available_to || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
+               <input name="available_to" type="time" required value={formData.available_to || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
             </div>
           </div>
 

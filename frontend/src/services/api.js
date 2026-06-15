@@ -259,23 +259,6 @@ export async function updatePlanRequest(id, planData) {
   return data;
 }
 
-export async function deletePlanRequest(id) {
-  const response = await fetch(`${API_URL}/plans/${id}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Error al eliminar plan");
-  }
-
-  return data;
-}
-
 export async function updateClassRequest(id, classData) {
   const response = await fetch(`${API_URL}/classes/${id}`, {
     method: "PUT",
@@ -559,7 +542,6 @@ export async function createCheckoutRequest(planId) {
   if (!response.ok) throw new Error(data.error || "Error al iniciar el pago");
   return data;
 }
-
 export async function updateMyAvailabilityRequest(available_from, available_to) {
   const response = await fetch(`${API_URL}/instructors/availability/me`, {
     method: "PUT",

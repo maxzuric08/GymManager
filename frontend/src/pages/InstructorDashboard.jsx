@@ -102,7 +102,11 @@ export default function InstructorDashboard() {
   }, [activeTab, loadHistory]);
 
   const handleLogout = async () => {
-    try { await logoutRequest(); } catch {}
+    try {
+      await logoutRequest();
+    } catch (error) {
+      console.error("Error al cerrar sesion:", error);
+    }
     localStorage.clear();
     navigate("/");
   };
@@ -230,7 +234,6 @@ export default function InstructorDashboard() {
           ) : (
             myClasses.map((cls) => {
               const isPast = cls.class_date < today;
-              const isFuture = cls.class_date > today;
               const isToday = cls.class_date === today;
               const hasAttendance = attendanceRegistered[cls.class_id];
               return (

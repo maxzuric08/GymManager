@@ -189,6 +189,11 @@ const handleSubmit = async (e) => {
   }
 };
 
+  const eligibleInstructors = instructors.filter((instructor) => {
+    const hasAvailability = instructor.available_from && instructor.available_to;
+    const sameBranch = formData.branch_id && Number(instructor.branch_id) === Number(formData.branch_id);
+    return instructor.status === "active" && hasAvailability && sameBranch;
+  });
   const getInstructorName = (instructorId) => {
     const instructor = instructors.find(
       (inst) => inst.instructor_id === instructorId
@@ -277,34 +282,36 @@ const handleSubmit = async (e) => {
               style={styles.input}
             />
 
+            <input
+              name="branch_id"
+              type="number"
+              placeholder="ID Sucursal"
+              value={formData.branch_id}
+              onChange={(event) => {
+                setFormData({ ...formData, branch_id: event.target.value, instructor_id: "" });
+              }}
+              style={styles.input}
+              min="1"
+              required
+            />
+
             <select
               name="instructor_id"
               value={formData.instructor_id}
               onChange={handleInputChange}
               style={styles.input}
               required
+              disabled={!formData.branch_id}
             >
-              <option value="">Seleccionar instructor</option>
-              {instructors.map((instructor) => (
-                <option
-                  key={instructor.instructor_id}
-                  value={instructor.instructor_id}
-                >
-                  {instructor.username} -{" "}
-                  {instructor.specialty || "Sin especialidad"}
+              <option value="">
+                {!formData.branch_id ? "Primero selecciona una sucursal" : "Seleccionar instructor disponible"}
+              </option>
+              {eligibleInstructors.map((instructor) => (
+                <option key={instructor.instructor_id} value={instructor.instructor_id}>
+                  {instructor.username} - {instructor.specialty || "Sin especialidad"} - {instructor.available_from.slice(0, 5)} a {instructor.available_to.slice(0, 5)}
                 </option>
               ))}
             </select>
-
-            <input
-              name="branch_id"
-              type="number"
-              placeholder="ID Sucursal"
-              value={formData.branch_id}
-              onChange={handleInputChange}
-              style={styles.input}
-            />
-
             <select
               name="status"
               value={formData.status}

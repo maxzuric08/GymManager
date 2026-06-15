@@ -1,13 +1,12 @@
 import { useState, useEffect } from "react";
 import Modal from "../Modal";
-import { getPlansRequest, createPlanRequest, updatePlanRequest, deletePlanRequest, deactivatePlanRequest, reactivatePlanRequest } from "../../services/api";
+import { getPlansRequest, createPlanRequest, updatePlanRequest, deactivatePlanRequest, reactivatePlanRequest } from "../../services/api";
 
 export default function PlansPanel() {
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
-  const [planToDelete, setPlanToDelete] = useState(null);
   const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
 
 
@@ -90,24 +89,6 @@ export default function PlansPanel() {
             });
         };
 
-
-    const confirmDeletePlan = async () => {
-          if (!planToDelete) return;
-
-          try {
-            await deletePlanRequest(planToDelete.plan_id);
-            setPlanToDelete(null);
-            fetchPlans();
-          } catch (err) {
-            setModal({
-              isOpen: true,
-              title: "Error",
-              message: err.message,
-              type: "error",
-              onConfirm: () => setModal({ ...modal, isOpen: false })
-            });
-          }
-        };
 
     const handleDeactivatePlan = async (planId) => {
           try {
@@ -301,47 +282,15 @@ export default function PlansPanel() {
                     Desactivar
                   </button>
                 ) : (
-                  <>
-                    <button onClick={() => handleReactivatePlan(plan.plan_id)} style={styles.reactivateBtn}>
-                      Reactivar
-                    </button>
-                    <button onClick={() => setPlanToDelete(plan)} style={styles.deleteBtn}>
-                      Eliminar
-                    </button>
-                  </>
+                  <button onClick={() => handleReactivatePlan(plan.plan_id)} style={styles.reactivateBtn}>
+                    Reactivar
+                  </button>
                 )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      {planToDelete && (
-              <div style={styles.modalOverlay}>
-                <div style={styles.modal}>
-                  <h3 style={styles.modalTitle}>Eliminar plan</h3>
-                  <p style={styles.modalText}>
-                    ¿Seguro que quieres eliminar el plan <strong>{planToDelete.plan_type}</strong>?
-                  </p>
-
-                  <div style={styles.modalActions}>
-                    <button
-                      onClick={() => setPlanToDelete(null)}
-                      style={styles.cancelBtn}
-                    >
-                      Cancelar
-                    </button>
-
-                    <button
-                      onClick={confirmDeletePlan}
-                      style={styles.confirmDeleteBtn}
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
       <Modal
         isOpen={modal.isOpen}
         title={modal.title}
@@ -436,68 +385,4 @@ const styles = {
       cursor: "pointer",
     },
 
-    deleteBtn: {
-      background: "#ef4444",
-      color: "white",
-      border: "none",
-      padding: "6px 10px",
-      borderRadius: "8px",
-      cursor: "pointer",
-    },
-    modalOverlay: {
-      position: "fixed",
-      top: 0,
-      left: 0,
-      width: "100%",
-      height: "100%",
-      backgroundColor: "rgba(0,0,0,0.45)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 999,
-    },
-
-    modal: {
-      backgroundColor: "white",
-      padding: "2rem",
-      borderRadius: "16px",
-      width: "420px",
-      maxWidth: "90%",
-      boxShadow: "0 20px 40px rgba(0,0,0,0.2)",
-    },
-
-    modalTitle: {
-      marginTop: 0,
-      marginBottom: "1rem",
-      fontSize: "1.4rem",
-    },
-
-    modalText: {
-      marginBottom: "1.5rem",
-      color: "#444",
-    },
-
-    modalActions: {
-      display: "flex",
-      justifyContent: "flex-end",
-      gap: "10px",
-    },
-
-    cancelBtn: {
-      padding: "10px 16px",
-      border: "none",
-      borderRadius: "8px",
-      backgroundColor: "#94a3b8",
-      color: "white",
-      cursor: "pointer",
-    },
-
-    confirmDeleteBtn: {
-      padding: "10px 16px",
-      border: "none",
-      borderRadius: "8px",
-      backgroundColor: "#ef4444",
-      color: "white",
-      cursor: "pointer",
-    },
 };

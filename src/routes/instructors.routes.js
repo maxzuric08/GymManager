@@ -4,11 +4,11 @@ const instructorController = require("../controllers/instructors.controllers");
 const verifyToken = require("../middleware/auth.middleware");
 const { requireAdmin, requireInstructor } = require("../middleware/role.middleware");
 
-router.get("/", verifyToken, instructorController.getInstructors);
+router.get("/", verifyToken, requireAdmin, instructorController.getInstructors);
 router.post("/", verifyToken, requireAdmin,instructorController.createInstructor);
 router.put("/availability/me", verifyToken, requireInstructor, instructorController.updateMyAvailability);
-router.post("/deactivate/me", verifyToken, instructorController.deactivateMyAccount);
-router.post("/reactivate/me", verifyToken, instructorController.reactivateMyAccount);
+router.post("/deactivate/me", verifyToken, requireInstructor, instructorController.deactivateMyAccount);
+router.post("/reactivate/me", verifyToken, requireInstructor, instructorController.reactivateMyAccount);
 router.put("/:id/reactivate", verifyToken, requireAdmin, instructorController.reactivateInstructor);
 router.put("/:id", verifyToken, requireAdmin, instructorController.updateInstructor);
 router.delete("/:id", verifyToken, requireAdmin, instructorController.deleteInstructor);

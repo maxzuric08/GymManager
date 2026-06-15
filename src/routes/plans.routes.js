@@ -11,6 +11,5 @@ router.put("/user/:id/remove-membership", verifyToken, requireAdmin, planControl
 router.put("/:id/deactivate", verifyToken, requireAdmin, planController.deactivatePlan);
 router.put("/:id/reactivate", verifyToken, requireAdmin, planController.reactivatePlan);
 router.put("/:id", verifyToken, requireAdmin, planController.updatePlan);
-router.delete("/:id", verifyToken, requireAdmin, planController.deletePlan);
 
 module.exports = router;
