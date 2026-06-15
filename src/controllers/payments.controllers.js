@@ -131,9 +131,9 @@ const createCheckout = async (req, res) => {
         }],
         external_reference: externalReference,
         back_urls: {
-          success: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=success`,
-          failure: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=failure`,
-          pending: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=pending`,
+          success: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=success&ngrok-skip-browser-warning=true`,
+          failure: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=failure&ngrok-skip-browser-warning=true`,
+          pending: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=pending&ngrok-skip-browser-warning=true`,
         },
         notification_url: `${process.env.BACKEND_PUBLIC_URL}/payments/webhook`,
         auto_return: "approved",
@@ -141,8 +141,7 @@ const createCheckout = async (req, res) => {
       externalReference
     );
 
-    const isTest = process.env.MP_ACCESS_TOKEN.startsWith("TEST-");
-    const checkoutUrl = isTest ? preference.sandbox_init_point : preference.init_point;
+    const checkoutUrl = preference.init_point;
     if (!preference.id || !checkoutUrl) {
       throw new Error("Mercado Pago no devolvio una preferencia valida");
     }

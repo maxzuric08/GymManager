@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from "react";
+import Modal from "../Modal";
 import { createCheckoutRequest, getMyPaymentsRequest } from "../../services/api";
 
 const money = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
@@ -21,6 +22,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
+  const [planToPay, setPlanToPay] = useState(null);
 
   const loadPayments = useCallback(async () => {
     try {
@@ -37,8 +39,10 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
 
   useEffect(() => { loadPayments(); }, [loadPayments]);
 
-  const payPlan = async (plan) => {
-    if (!window.confirm(`Vas a pagar ${money.format(plan.cost)} por el plan ${plan.plan_type}.`)) return;
+  const confirmPayment = async () => {
+    if (!planToPay) return;
+    const plan = planToPay;
+    setPlanToPay(null);
     setWorking(true);
     setError("");
     try {
@@ -77,7 +81,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
               <p style={styles.price}>{money.format(plan.cost)}</p>
               <p style={styles.muted}>{plan.duration || `${plan.duration_value} ${plan.duration_unit}`}</p>
               <p>{plan.benefits}</p>
-              <button type="button" disabled={working} onClick={() => payPlan(plan)} style={{ ...styles.primaryButton, opacity: working ? 0.55 : 1 }}>
+              <button type="button" disabled={working} onClick={() => setPlanToPay(plan)} style={{ ...styles.primaryButton, opacity: working ? 0.55 : 1 }}>
                 {isCurrent ? "Renovar plan" : "Pagar plan"}
               </button>
             </article>
@@ -103,6 +107,19 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
           </div>
         </section>
       )}
+
+      <Modal
+        isOpen={Boolean(planToPay)}
+        title={planToPay ? `Confirmar ${Number(membership?.plan_id) === Number(planToPay.plan_id) ? "renovación" : "pago"}` : ""}
+        message={planToPay
+          ? `Vas a pagar ${money.format(planToPay.cost)} por el plan ${planToPay.plan_type}. Serás redirigido a Mercado Pago para completar la operación.`
+          : ""}
+        type="warning"
+        confirmText="Continuar al pago"
+        cancelText="Cancelar"
+        onConfirm={confirmPayment}
+        onCancel={() => setPlanToPay(null)}
+      />
     </div>
   );
 }
