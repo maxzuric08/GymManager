@@ -70,7 +70,7 @@ const createPlan =  async (req, res) => {
 const updatePlan =  async (req, res) => {
     try {
         const { id } = req.params;
-        const { plan_type, cost, duration, benefits, class_limit, status, duration_value, duration_unit } = req.body;
+        const { plan_type, cost, duration, benefits, class_limit, duration_value, duration_unit } = req.body;
 
         const result = await pool.query(
             `UPDATE plans
@@ -79,10 +79,9 @@ const updatePlan =  async (req, res) => {
                  duration = $3,
                  benefits = $4,
                  class_limit = $5,
-                 status = $6,
-                 duration_value = $7,
-                 duration_unit = $8
-             WHERE plan_id = $9
+                 duration_value = $6,
+                 duration_unit = $7
+             WHERE plan_id = $8
              RETURNING *`,
             [
                 plan_type,
@@ -90,7 +89,6 @@ const updatePlan =  async (req, res) => {
                 duration,
                 benefits,
                 class_limit,
-                status,
                 duration_value || 1,
                 duration_unit || "months",
                 id
@@ -172,7 +170,7 @@ const deactivatePlan = async (req, res) => {
     // Contar cuántos usuarios todavía tienen este plan activo
     const usersWithPlan = await pool.query(
       `SELECT COUNT(*) as count FROM users
-       WHERE plan_id = $1 AND user_status = 'active' AND plan_expiration_date > CURRENT_DATE`,
+       WHERE plan_id = $1 AND user_status = 'active' AND plan_expiration_date >= CURRENT_DATE`,
       [id]
     );
 

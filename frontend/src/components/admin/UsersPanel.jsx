@@ -19,7 +19,7 @@ export default function UsersPanel() {
 
   const [formData, setFormData] = useState({
     username: "", password: "", dni: "", first_name: "", last_name: "",
-    email: "", phone: "", birth_date: "", branch_id: "", plan_id: "", user_status: "active",
+    email: "", phone: "", birth_date: "", branch_id: "", plan_id: "",
   });
 
   const fetchUsers = async () => {
@@ -62,7 +62,7 @@ export default function UsersPanel() {
 
       setFormData({
         username: "", password: "", dni: "", first_name: "", last_name: "",
-        email: "", phone: "", birth_date: "", branch_id: "", plan_id: "", user_status: "active",
+        email: "", phone: "", birth_date: "", branch_id: "", plan_id: "",
       });
     } catch (err) {
       setModal({
@@ -85,7 +85,6 @@ export default function UsersPanel() {
       dni: user.dni || "", email: user.email || "", phone: user.phone || "",
       birth_date: user.birth_date ? user.birth_date.slice(0, 10) : "",
       branch_id: user.branch_id ?? null, plan_id: user.plan_id ?? null,
-      user_status: user.user_status || "active",
     });
   };
 
@@ -93,9 +92,16 @@ export default function UsersPanel() {
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
     try {
-      await deleteUserRequest(userToDelete.user_id);
+      const result = await deleteUserRequest(userToDelete.user_id);
       setUserToDelete(null);
-      fetchUsers();
+      await fetchUsers();
+      setModal({
+        isOpen: true,
+        title: "Usuario desactivado",
+        message: `${result.cancelledBookings || 0} reservas futuras fueron canceladas.`,
+        type: "success",
+        onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
+      });
     } catch (err) {
       alert(err.message);
     }
@@ -106,7 +112,7 @@ export default function UsersPanel() {
     setShowForm(true);
     setFormData({
       username: "", password: "", first_name: "", last_name: "", dni: "",
-      email: "", phone: "", birth_date: "", branch_id: null, plan_id: null, user_status: "active",
+      email: "", phone: "", birth_date: "", branch_id: null, plan_id: null,
     });
   };
 
@@ -193,10 +199,6 @@ export default function UsersPanel() {
             <input name="branch_id" type="number" placeholder="ID Sucursal" value={formData.branch_id || ""} onChange={handleInputChange} style={styles.input} />
             <input name="plan_id" type="number" placeholder="ID Plan" value={formData.plan_id || ""} onChange={handleInputChange} style={styles.input} />
 
-            <select name="user_status" value={formData.user_status || "active"} onChange={handleInputChange} style={styles.input}>
-              <option value="active">Activo</option>
-              <option value="inactive">Inactivo</option>
-            </select>
           </div>
 
           <div style={{ marginTop: "1.5rem" }}>
@@ -226,7 +228,7 @@ export default function UsersPanel() {
                     {user.plan_id && (
                       <button onClick={() => handleRemoveMembership(user.user_id)} style={styles.warningBtn}>Sin plan</button>
                     )}
-                    <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>Eliminar</button>
+                    <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>Desactivar</button>
                   </>
                 )}
               </td>
@@ -235,17 +237,17 @@ export default function UsersPanel() {
         </tbody>
       </table>
 
-      {/* --- MODAL DE ELIMINAR --- */}
+      {/* --- MODAL DE DESACTIVAR --- */}
       {userToDelete && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h3 style={styles.modalTitle}>Eliminar usuario</h3>
+            <h3 style={styles.modalTitle}>Desactivar usuario</h3>
             <p style={styles.modalText}>
-              ¿Seguro que quieres eliminar al usuario <strong>{userToDelete.username}</strong>?
+              ¿Seguro que quieres desactivar al usuario <strong>{userToDelete.username}</strong>? Sus reservas futuras serán canceladas.
             </p>
             <div style={styles.modalActions}>
               <button onClick={() => setUserToDelete(null)} style={styles.cancelBtn}>Cancelar</button>
-              <button onClick={confirmDeleteUser} style={styles.confirmDeleteBtn}>Eliminar</button>
+              <button onClick={confirmDeleteUser} style={styles.confirmDeleteBtn}>Desactivar</button>
             </div>
           </div>
         </div>

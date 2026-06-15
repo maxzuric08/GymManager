@@ -209,7 +209,7 @@ export default function InstructorsPanel() {
                 {instructor.status === 'inactive' ? (
                   <button onClick={() => handleReactivateInstructor(instructor.instructor_id)} style={styles.reactivateBtn}>Reactivar</button>
                 ) : (
-                  <button onClick={() => setInstructorToDelete(instructor)} style={styles.deleteBtn}>Eliminar</button>
+                  <button onClick={() => setInstructorToDelete(instructor)} style={styles.deleteBtn}>Desactivar</button>
                 )}
               </td>
             </tr>
@@ -217,17 +217,17 @@ export default function InstructorsPanel() {
         </tbody>
       </table>
 
-      {/* --- MODAL DE ELIMINAR --- */}
+      {/* --- MODAL DE DESACTIVAR --- */}
       {instructorToDelete && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
-            <h3 style={styles.modalTitle}>Eliminar instructor</h3>
+            <h3 style={styles.modalTitle}>Desactivar instructor</h3>
             <p style={styles.modalText}>
-              ¿Seguro que quieres eliminar al instructor <strong>{instructorToDelete.username}</strong>?
+              ¿Seguro que quieres desactivar al instructor <strong>{instructorToDelete.username}</strong>?
             </p>
             <div style={styles.modalActions}>
               <button onClick={() => setInstructorToDelete(null)} style={styles.cancelBtn}>Cancelar</button>
-              <button onClick={confirmDeleteInstructor} style={styles.confirmDeleteBtn}>Eliminar</button>
+              <button onClick={confirmDeleteInstructor} style={styles.confirmDeleteBtn}>Desactivar</button>
             </div>
           </div>
         </div>

@@ -8,6 +8,34 @@ const sanitizeBase64 = (value = "") => {
     return value.replace(/^data:[^;]+;base64,/, "");
 };
 
+const sanitizeFileName = (value = "") => {
+    return value
+        .replace(/[/\\?%*:|"<>]/g, "_")
+        .replace(/[\u0000-\u001f\u007f]/g, "")
+        .trim()
+        .slice(0, 255);
+};
+
+const isValidBase64 = (value) => {
+    if (!value || value.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) {
+        return false;
+    }
+    return Buffer.from(value, "base64").toString("base64") === value;
+};
+
+const matchesFileSignature = (buffer, mimeType) => {
+    if (mimeType === "application/pdf") return buffer.subarray(0, 5).toString() === "%PDF-";
+    if (mimeType === "image/jpeg") return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    if (mimeType === "image/png") {
+        return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    }
+    if (mimeType === "image/webp") {
+        return buffer.subarray(0, 4).toString() === "RIFF" &&
+            buffer.subarray(8, 12).toString() === "WEBP";
+    }
+    return false;
+};
+
 const getMyMedicalCertificate = async (req, res) => {
     try {
         if (!req.user || !req.user.id) {
@@ -39,6 +67,7 @@ const getMyMedicalCertificate = async (req, res) => {
 };
 
 const uploadMedicalCertificate = async (req, res) => {
+    const client = await pool.connect();
     try {
         if (!req.user || !req.user.id) {
             return res.status(401).json({ error: "Usuario no autenticado" });
@@ -57,9 +86,14 @@ const uploadMedicalCertificate = async (req, res) => {
         }
 
         const base64Data = sanitizeBase64(file_data);
-        const fileBuffer = Buffer.from(base64Data, "base64");
+        if (!isValidBase64(base64Data)) {
+            return res.status(400).json({ error: "El archivo recibido no es valido" });
+        }
 
-        if (!fileBuffer.length) {
+        const fileBuffer = Buffer.from(base64Data, "base64");
+        const safeFileName = sanitizeFileName(file_name);
+
+        if (!safeFileName || !fileBuffer.length) {
             return res.status(400).json({ error: "El archivo esta vacio" });
         }
 
@@ -69,7 +103,33 @@ const uploadMedicalCertificate = async (req, res) => {
             });
         }
 
-        const result = await pool.query(
+        if (!matchesFileSignature(fileBuffer, mime_type)) {
+            return res.status(400).json({
+                error: "El contenido del archivo no coincide con el formato declarado"
+            });
+        }
+
+        await client.query("BEGIN");
+        await client.query("SELECT user_id FROM users WHERE user_id = $1 FOR UPDATE", [req.user.id]);
+
+        const activeCertificate = await client.query(
+            `SELECT medical_certificate_id, status
+               FROM medical_certificates
+              WHERE user_id = $1
+                AND status IN ('pending', 'approved')
+              LIMIT 1`,
+            [req.user.id]
+        );
+
+        if (activeCertificate.rows[0]) {
+            await client.query("ROLLBACK");
+            const message = activeCertificate.rows[0].status === "pending"
+                ? "Ya tenes un apto medico pendiente de revision"
+                : "Ya tenes un apto medico aprobado";
+            return res.status(409).json({ error: message });
+        }
+
+        const result = await client.query(
             `INSERT INTO medical_certificates
              (user_id, file_name, mime_type, file_data, status, rejection_reason, uploaded_at, reviewed_at, reviewed_by)
              VALUES ($1, $2, $3, $4, 'pending', NULL, CURRENT_TIMESTAMP, NULL, NULL)
@@ -82,16 +142,23 @@ const uploadMedicalCertificate = async (req, res) => {
                        uploaded_at,
                        reviewed_at,
                        reviewed_by`,
-            [req.user.id, file_name, mime_type, fileBuffer]
+            [req.user.id, safeFileName, mime_type, fileBuffer]
         );
 
+        await client.query("COMMIT");
         res.status(201).json({
             message: "Apto medico enviado para revision",
             certificate: result.rows[0]
         });
     } catch (error) {
+        await client.query("ROLLBACK");
+        if (error.code === "23505") {
+            return res.status(409).json({ error: "Ya tenes un apto medico pendiente o aprobado" });
+        }
         console.error("Error en uploadMedicalCertificate:", error);
         res.status(500).json({ error: "Error al subir el apto medico" });
+    } finally {
+        client.release();
     }
 };
 
@@ -211,6 +278,7 @@ const reviewMedicalCertificate = async (req, res) => {
                  reviewed_at = CURRENT_TIMESTAMP,
                  reviewed_by = $3
              WHERE medical_certificate_id = $4
+               AND status = 'pending'
              RETURNING medical_certificate_id,
                        user_id,
                        file_name,
@@ -229,6 +297,13 @@ const reviewMedicalCertificate = async (req, res) => {
         );
 
         if (result.rows.length === 0) {
+            const existing = await pool.query(
+                "SELECT status FROM medical_certificates WHERE medical_certificate_id = $1",
+                [id]
+            );
+            if (existing.rows[0]) {
+                return res.status(409).json({ error: "Este apto medico ya fue revisado" });
+            }
             return res.status(404).json({ error: "Apto medico no encontrado" });
         }
 

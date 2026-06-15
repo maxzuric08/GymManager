@@ -30,6 +30,7 @@ export default function UserDashboard() {
 
   const [medicalCertificate, setMedicalCertificate] = useState(null);
   const [medicalFile, setMedicalFile] = useState(null);
+  const [uploadingMedicalCertificate, setUploadingMedicalCertificate] = useState(false);
   const [myPayments, setMyPayments] = useState([]);
 
   const [message, setMessage] = useState("");
@@ -165,12 +166,15 @@ export default function UserDashboard() {
   const handleUploadMedicalCertificate = async (e) => {
     e.preventDefault();
 
+    if (uploadingMedicalCertificate) return;
+
     if (!medicalFile) {
       setError("Selecciona un archivo.");
       return;
     }
 
     try {
+      setUploadingMedicalCertificate(true);
       const fileData = await fileToBase64(medicalFile);
 
       const result = await uploadMedicalCertificateRequest({
@@ -182,10 +186,12 @@ export default function UserDashboard() {
       setMessage(result.message);
       setError("");
       setMedicalFile(null);
-      fetchMedicalCertificate();
+      await fetchMedicalCertificate();
     } catch (err) {
       setError(err.message);
       setMessage("");
+    } finally {
+      setUploadingMedicalCertificate(false);
     }
   };
 
@@ -429,20 +435,33 @@ export default function UserDashboard() {
                 )}
               </div>
 
-              <form onSubmit={handleUploadMedicalCertificate} style={styles.card}>
-                <h3 style={{ marginTop: 0 }}>Subir nuevo apto</h3>
+              {(!medicalCertificate || medicalCertificate.status === "rejected") && (
+                  <form onSubmit={handleUploadMedicalCertificate} style={styles.card}>
+                    <h3 style={{ marginTop: 0 }}>
+                      {medicalCertificate?.status === "rejected" ? "Enviar nuevo apto" : "Subir nuevo apto"}
+                    </h3>
 
-                <input
-                    type="file"
-                    accept=".pdf,image/png,image/jpeg,image/webp"
-                    onChange={(e) => setMedicalFile(e.target.files[0] || null)}
-                    style={styles.input}
-                />
+                    <input
+                        type="file"
+                        accept=".pdf,image/png,image/jpeg,image/webp"
+                        disabled={uploadingMedicalCertificate}
+                        onChange={(e) => setMedicalFile(e.target.files[0] || null)}
+                        style={styles.input}
+                    />
 
-                <button type="submit" style={styles.button}>
-                  Enviar a revision
-                </button>
-              </form>
+                    <button
+                        type="submit"
+                        disabled={uploadingMedicalCertificate}
+                        style={{
+                          ...styles.button,
+                          opacity: uploadingMedicalCertificate ? 0.6 : 1,
+                          cursor: uploadingMedicalCertificate ? "not-allowed" : "pointer",
+                        }}
+                    >
+                      {uploadingMedicalCertificate ? "Enviando..." : "Enviar a revision"}
+                    </button>
+                  </form>
+              )}
             </div>
         )}
 

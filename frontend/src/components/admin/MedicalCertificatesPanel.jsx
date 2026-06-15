@@ -12,6 +12,7 @@ export default function MedicalCertificatesPanel() {
     const [message, setMessage] = useState("");
     const [rejectingId, setRejectingId] = useState(null);
     const [rejectionReason, setRejectionReason] = useState("");
+    const [reviewingId, setReviewingId] = useState(null);
 
     const fetchCertificates = useCallback(async () => {
         try {
@@ -28,23 +29,29 @@ export default function MedicalCertificatesPanel() {
     }, [fetchCertificates]);
 
     const handleApprove = async (id) => {
+        if (reviewingId !== null) return;
         try {
+            setReviewingId(id);
             await reviewMedicalCertificateRequest(id, "approved");
             setMessage("Apto medico aprobado");
             setError("");
             fetchCertificates();
         } catch (err) {
             setError(err.message);
+        } finally {
+            setReviewingId(null);
         }
     };
 
     const handleReject = async (id) => {
+        if (reviewingId !== null) return;
         if (!rejectionReason.trim()) {
             setError("Indica el motivo del rechazo");
             return;
         }
 
         try {
+            setReviewingId(id);
             await reviewMedicalCertificateRequest(id, "rejected", rejectionReason);
             setMessage("Apto medico rechazado");
             setError("");
@@ -53,6 +60,8 @@ export default function MedicalCertificatesPanel() {
             fetchCertificates();
         } catch (err) {
             setError(err.message);
+        } finally {
+            setReviewingId(null);
         }
     };
 
@@ -120,13 +129,15 @@ export default function MedicalCertificatesPanel() {
                                 <>
                                     <button
                                         onClick={() => handleApprove(certificate.medical_certificate_id)}
+                                        disabled={reviewingId !== null}
                                         style={styles.approveBtn}
                                     >
-                                        Aprobar
+                                        {reviewingId === certificate.medical_certificate_id ? "Procesando..." : "Aprobar"}
                                     </button>
 
                                     <button
                                         onClick={() => setRejectingId(certificate.medical_certificate_id)}
+                                        disabled={reviewingId !== null}
                                         style={styles.rejectBtn}
                                     >
                                         Rechazar
@@ -166,8 +177,12 @@ export default function MedicalCertificatesPanel() {
                                 Cancelar
                             </button>
 
-                            <button onClick={() => handleReject(rejectingId)} style={styles.rejectBtn}>
-                                Confirmar rechazo
+                            <button
+                                onClick={() => handleReject(rejectingId)}
+                                disabled={reviewingId !== null}
+                                style={styles.rejectBtn}
+                            >
+                                {reviewingId === rejectingId ? "Procesando..." : "Confirmar rechazo"}
                             </button>
                         </div>
                     </div>

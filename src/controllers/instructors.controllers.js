@@ -25,9 +25,12 @@ function validateInstructorData({ username, dni, first_name, last_name, phone, e
 async function findFutureScheduleConflict(instructorId, availableFrom, availableTo, branchId) {
   const result = await pool.query(
     `SELECT class_id, class_name, class_date, start_time, end_time, branch_id
-       FROM classes
+      FROM classes
       WHERE instructor_id = $1
-        AND class_date >= CURRENT_DATE
+        AND (
+          class_date > CURRENT_DATE OR
+          (class_date = CURRENT_DATE AND start_time > LOCALTIME)
+        )
         AND status NOT IN ('cancelled', 'inactive')
         AND (
           $2::time IS NULL OR $3::time IS NULL OR

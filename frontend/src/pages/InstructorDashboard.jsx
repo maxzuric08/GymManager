@@ -23,9 +23,12 @@ const CLASS_STATUS_LABELS = {
   cancelled: "Cancelada",
 };
 
-const formatInputDate = (date) => date.toISOString().slice(0, 10);
+const formatInputDate = (date) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+};
 
-const today = new Date().toISOString().slice(0, 10);
+const getClassDate = (value) => value?.slice(0, 10) || "";
 
 function Metric({ label, value, accent = "#0f172a" }) {
   return (
@@ -63,6 +66,12 @@ export default function InstructorDashboard() {
   const [attendanceData, setAttendanceData] = useState({});
   const [savingAttendance, setSavingAttendance] = useState(false);
   const [attendanceSaved, setAttendanceSaved] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentDateTime(new Date()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const fetchMyAgenda = async () => {
@@ -117,7 +126,7 @@ export default function InstructorDashboard() {
       const initial = {};
       data.students.forEach((s) => {
         initial[s.booking_id] = {
-          status: s.attendance_status || "present",
+          status: s.attendance_status || "",
           notes: s.notes || "",
         };
       });
@@ -130,6 +139,16 @@ export default function InstructorDashboard() {
   };
 
   const handleSaveAttendance = async () => {
+    if (Object.values(attendanceData).some((item) => !item.status)) {
+      setModal({
+        isOpen: true,
+        title: "Faltan estados",
+        message: "Seleccioná el estado de asistencia de todos los alumnos.",
+        type: "error",
+      });
+      return;
+    }
+
     setSavingAttendance(true);
     try {
       const attendances = Object.entries(attendanceData).map(([booking_id, val]) => ({
@@ -172,6 +191,8 @@ export default function InstructorDashboard() {
   };
 
   const summary = overview.summary || {};
+  const today = formatInputDate(currentDateTime);
+  const currentTime = currentDateTime.toTimeString().slice(0, 8);
 
   return (
     <div style={styles.container}>
@@ -233,8 +254,10 @@ export default function InstructorDashboard() {
             <div style={styles.emptyState}>No tenés clases asignadas por el momento.</div>
           ) : (
             myClasses.map((cls) => {
-              const isPast = cls.class_date < today;
-              const isToday = cls.class_date === today;
+              const classDate = getClassDate(cls.class_date);
+              const isPast = classDate < today;
+              const isToday = classDate === today;
+              const hasStarted = isToday && cls.start_time <= currentTime;
               const hasAttendance = attendanceRegistered[cls.class_id];
               return (
                 <div key={cls.class_id} style={{
@@ -261,15 +284,17 @@ export default function InstructorDashboard() {
                   </div>
                   {cls.status !== "cancelled" && (
                     <div style={{ marginTop: "auto" }}>
-                      {hasAttendance && isToday && (
+                      {hasAttendance && hasStarted && (
                         <p style={styles.attendanceDone}>✓ Asistencia registrada</p>
                       )}
-                      {isToday ? (
+                      {hasStarted ? (
                         <button onClick={() => openAttendanceModal(cls)} style={styles.attendanceBtn}>
                           {hasAttendance ? "Editar Asistencia" : "Registrar Asistencia"}
                         </button>
                       ) : isPast ? (
                         <p style={styles.attendanceExpired}>Plazo vencido</p>
+                      ) : isToday ? (
+                        <p style={styles.attendancePending}>Disponible desde las {cls.start_time?.slice(0, 5)}</p>
                       ) : (
                         <p style={styles.attendancePending}>Disponible el día de la clase</p>
                       )}
@@ -328,12 +353,12 @@ export default function InstructorDashboard() {
               </thead>
               <tbody>
                 {!loadingHistory && overview.classes.length === 0 && (
-                  <tr><td colSpan="8" style={styles.empty}>No hay clases en el período seleccionado.</td></tr>
+                  <tr><td colSpan="9" style={styles.empty}>No hay clases en el período seleccionado.</td></tr>
                 )}
                 {overview.classes.map((row) => (
                   <tr key={row.class_id}>
                     <td style={styles.td}><strong>{row.class_name}</strong></td>
-                    <td style={styles.td}>{row.class_date ? new Date(`${row.class_date}T00:00:00`).toLocaleDateString("es-AR") : "-"}</td>
+                    <td style={styles.td}>{row.class_date ? new Date(`${getClassDate(row.class_date)}T00:00:00`).toLocaleDateString("es-AR") : "-"}</td>
                     <td style={styles.td}>{row.start_time?.slice(0, 5)} - {row.end_time?.slice(0, 5)}</td>
                     <td style={styles.td}>{row.booked}</td>
                     <td style={{ ...styles.td, color: "#16a34a", fontWeight: "bold" }}>{row.present}</td>
@@ -388,10 +413,11 @@ export default function InstructorDashboard() {
                         <td style={styles.mtd}>{student.dni || "-"}</td>
                         <td style={styles.mtd}>
                           <select
-                            value={attendanceData[student.booking_id]?.status || "present"}
+                            value={attendanceData[student.booking_id]?.status || ""}
                             onChange={(e) => setAttendanceData((prev) => ({ ...prev, [student.booking_id]: { ...prev[student.booking_id], status: e.target.value } }))}
-                            style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #ccc", fontWeight: "bold", color: STATUS_LABELS[attendanceData[student.booking_id]?.status || "present"]?.color }}
+                            style={{ padding: "4px 8px", borderRadius: "6px", border: "1px solid #ccc", fontWeight: "bold", color: STATUS_LABELS[attendanceData[student.booking_id]?.status]?.color || "#64748b" }}
                           >
+                            <option value="">Seleccionar</option>
                             {Object.entries(STATUS_LABELS).map(([val, { label }]) => (
                               <option key={val} value={val}>{label}</option>
                             ))}

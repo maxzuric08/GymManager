@@ -89,15 +89,17 @@ const saveClassAttendance = async (req, res) => {
 
         for (const item of attendances) {
             await client.query(
-                `INSERT INTO attendance (booking_id, class_id, status, notes, marked_by_admin, check_in_time)
-                 VALUES ($1, $2, $3, $4, $5,
+                `INSERT INTO attendance (booking_id, class_id, status, notes, marked_by_admin, marked_by_instructor, check_in_time)
+                 VALUES ($1, $2, $3, $4, $5, NULL,
                          CASE WHEN $3::varchar IN ('present', 'late') THEN CURRENT_TIMESTAMP ELSE NULL END)
                  ON CONFLICT (booking_id)
                  DO UPDATE SET status = EXCLUDED.status,
                                notes = EXCLUDED.notes,
                                marked_by_admin = EXCLUDED.marked_by_admin,
+                               marked_by_instructor = NULL,
                                check_in_time = CASE
-                                   WHEN EXCLUDED.status IN ('present', 'late') THEN CURRENT_TIMESTAMP
+                                   WHEN EXCLUDED.status IN ('present', 'late')
+                                       THEN COALESCE(attendance.check_in_time, CURRENT_TIMESTAMP)
                                    ELSE NULL
                                END`,
                 [item.booking_id, classId, item.status, item.notes?.trim() || null, req.user.id]
@@ -287,7 +289,10 @@ const saveInstructorClassAttendance = async (req, res) => {
         await client.query("BEGIN");
 
         const classResult = await client.query(
-            "SELECT class_id, class_date FROM classes WHERE class_id = $1 AND instructor_id = $2",
+            `SELECT class_id, class_date, start_time, status
+               FROM classes
+              WHERE class_id = $1 AND instructor_id = $2
+              FOR UPDATE`,
             [classId, instructorId]
         );
         if (classResult.rows.length === 0) {
@@ -295,11 +300,19 @@ const saveInstructorClassAttendance = async (req, res) => {
             return res.status(404).json({ error: "Clase no encontrada o no te pertenece" });
         }
 
-        const classDate = classResult.rows[0].class_date.toISOString().slice(0, 10);
-        const todayDate = new Date().toISOString().slice(0, 10);
-        if (classDate !== todayDate) {
+        const gymClass = classResult.rows[0];
+        if (!["active", "scheduled"].includes(gymClass.status)) {
             await client.query("ROLLBACK");
-            return res.status(403).json({ error: "Solo podés registrar asistencia el día de la clase" });
+            return res.status(409).json({ error: "No se puede registrar asistencia en una clase cancelada o inactiva" });
+        }
+
+        const availability = await client.query(
+            `SELECT ($1::date = CURRENT_DATE AND $2::time <= LOCALTIME) AS available`,
+            [gymClass.class_date, gymClass.start_time]
+        );
+        if (!availability.rows[0].available) {
+            await client.query("ROLLBACK");
+            return res.status(403).json({ error: "La asistencia se habilita cuando comienza la clase" });
         }
 
         const bookingsResult = await client.query(
@@ -315,15 +328,17 @@ const saveInstructorClassAttendance = async (req, res) => {
 
         for (const item of attendances) {
             await client.query(
-                `INSERT INTO attendance (booking_id, class_id, status, notes, marked_by_admin, check_in_time)
-                 VALUES ($1, $2, $3, $4, $5,
+                `INSERT INTO attendance (booking_id, class_id, status, notes, marked_by_admin, marked_by_instructor, check_in_time)
+                 VALUES ($1, $2, $3, $4, NULL, $5,
                          CASE WHEN $3::varchar IN ('present', 'late') THEN CURRENT_TIMESTAMP ELSE NULL END)
                  ON CONFLICT (booking_id)
                  DO UPDATE SET status = EXCLUDED.status,
                                notes = EXCLUDED.notes,
-                               marked_by_admin = EXCLUDED.marked_by_admin,
+                               marked_by_admin = NULL,
+                               marked_by_instructor = EXCLUDED.marked_by_instructor,
                                check_in_time = CASE
-                                   WHEN EXCLUDED.status IN ('present', 'late') THEN CURRENT_TIMESTAMP
+                                   WHEN EXCLUDED.status IN ('present', 'late')
+                                       THEN COALESCE(attendance.check_in_time, CURRENT_TIMESTAMP)
                                    ELSE NULL
                                END`,
                 [item.booking_id, classId, item.status, item.notes?.trim() || null, instructorId]
@@ -378,7 +393,13 @@ const getInstructorAttendanceHistory = async (req, res) => {
              FROM classes c
              LEFT JOIN bookings b ON b.class_id = c.class_id AND b.status = 'confirmed'
              LEFT JOIN attendance a ON a.booking_id = b.booking_id
-             WHERE c.instructor_id = $1 AND c.class_date BETWEEN $2 AND $3
+             WHERE c.instructor_id = $1
+               AND c.class_date BETWEEN $2 AND $3
+               AND c.status NOT IN ('cancelled', 'inactive')
+               AND (
+                   c.class_date < CURRENT_DATE
+                   OR (c.class_date = CURRENT_DATE AND c.start_time <= LOCALTIME)
+               )
              GROUP BY c.class_id
              ORDER BY c.class_date DESC, c.start_time DESC`,
             [instructorId, from, to]

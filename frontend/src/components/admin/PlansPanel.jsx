@@ -18,7 +18,6 @@ export default function PlansPanel() {
     duration_unit: "months",
     benefits: "",
     class_limit: "",
-    status: "active",
   });
 
   const fetchPlans = async () => {
@@ -60,7 +59,6 @@ export default function PlansPanel() {
           duration_unit: "months",
           benefits: "",
           class_limit: "",
-          status: "active",
         });
       } catch (err) {
         setModal({
@@ -85,7 +83,6 @@ export default function PlansPanel() {
             duration_unit: plan.duration_unit || "months",
             benefits: plan.benefits || "",
             class_limit: plan.class_limit || "",
-            status: plan.status || "active",
             });
         };
 
@@ -149,7 +146,6 @@ export default function PlansPanel() {
             duration_unit: "months",
             benefits: "",
             class_limit: "",
-            status: "active",
           });
         };
 
@@ -229,15 +225,6 @@ export default function PlansPanel() {
               onChange={handleInputChange}
               style={styles.input}
             />
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleInputChange}
-              style={styles.input}
-            >
-              <option value="active">Activo</option>
-              <option value="inactive">Inactivo</option>
-            </select>
           </div>
 
           <button type="submit" style={{ ...styles.primaryBtn, marginTop: "1rem" }}>

@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS attendance (
     check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status VARCHAR(20) DEFAULT 'present',
     marked_by_admin INTEGER,
+    marked_by_instructor INTEGER REFERENCES instructors(instructor_id),
     notes TEXT,
     CONSTRAINT attendance_status_check CHECK (status IN ('present', 'absent', 'late', 'excused')),
     CONSTRAINT attendance_booking_unique UNIQUE (booking_id)
@@ -126,6 +127,9 @@ BEGIN
         FOREIGN KEY (marked_by_admin) REFERENCES administrators(admin_id);
     END IF;
 END $$;
+
+ALTER TABLE attendance
+ADD COLUMN IF NOT EXISTS marked_by_instructor INTEGER REFERENCES instructors(instructor_id);
 
 -- Admin-Permisos
 CREATE TABLE IF NOT EXISTS admin_permissions (
@@ -214,3 +218,10 @@ CREATE TABLE IF NOT EXISTS medical_certificates (
     reviewed_by INTEGER REFERENCES administrators(admin_id),
     CHECK (status IN ('pending', 'approved', 'rejected'))
     );
+
+CREATE INDEX IF NOT EXISTS idx_medical_certificates_user_id
+ON medical_certificates(user_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS medical_certificates_one_active_per_user
+ON medical_certificates(user_id)
+WHERE status IN ('pending', 'approved');

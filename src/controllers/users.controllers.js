@@ -85,7 +85,7 @@ const createUser = async (req, res) => {
   try {
     const {
       branch_id, plan_id, username, password, dni, first_name, last_name,
-      email, phone, birth_date, user_status,
+      email, phone, birth_date,
     } = req.body;
 
     const validationError = validateUserData(req.body, { passwordRequired: true });
@@ -106,14 +106,13 @@ const createUser = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users
         (branch_id, plan_id, username, password, dni, first_name, last_name,
-         email, phone, birth_date, plan_expiration_date, user_status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         email, phone, birth_date, plan_expiration_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        RETURNING user_id, branch_id, plan_id, username, dni, first_name,
                  last_name, email, phone, user_status, birth_date,
                  registration_date, plan_expiration_date`,
       [branch_id || null, plan_id || null, username.trim(), password, dni,
-       first_name, last_name, email, phone, birth_date || null, expirationDate,
-       user_status || "active"]
+       first_name, last_name, email, phone, birth_date || null, expirationDate]
     );
 
     return res.status(201).json(result.rows[0]);
@@ -127,7 +126,7 @@ const updateUser = async (req, res) => {
     const { id } = req.params;
     const {
       branch_id, plan_id, username, password, dni, first_name, last_name,
-      email, phone, birth_date, user_status,
+      email, phone, birth_date,
     } = req.body;
 
     const validationError = validateUserData(req.body);
@@ -170,15 +169,14 @@ const updateUser = async (req, res) => {
               email = $8,
               phone = $9,
               birth_date = $10,
-              user_status = $11,
-              plan_expiration_date = $12
-        WHERE user_id = $13
+              plan_expiration_date = $11
+        WHERE user_id = $12
         RETURNING user_id, branch_id, plan_id, username, dni, first_name,
                   last_name, email, phone, user_status, birth_date,
                   registration_date, plan_expiration_date`,
       [branch_id || null, normalizedPlanId, username.trim(), password || null,
        dni, first_name, last_name, email, phone, birth_date || null,
-       user_status || "active", expirationDate, id]
+       expirationDate, id]
     );
 
     return res.json(result.rows[0]);
@@ -187,40 +185,84 @@ const updateUser = async (req, res) => {
   }
 };
 
+async function deactivateUserAccount(client, userId) {
+  const userResult = await client.query(
+    `UPDATE users
+        SET user_status = 'inactive'
+      WHERE user_id = $1
+      RETURNING user_id, username, email, user_status`,
+    [userId]
+  );
+
+  if (!userResult.rows[0]) return null;
+
+  const bookingsResult = await client.query(
+    `UPDATE bookings b
+        SET status = 'cancelled',
+            cancellation_reason = 'Cuenta desactivada'
+       FROM classes c
+      WHERE b.class_id = c.class_id
+        AND b.user_id = $1
+        AND b.status = 'confirmed'
+        AND (
+            c.class_date > CURRENT_DATE OR
+            (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+        )
+      RETURNING b.booking_id`,
+    [userId]
+  );
+
+  return {
+    user: userResult.rows[0],
+    cancelledBookings: bookingsResult.rowCount,
+  };
+}
+
 const deleteUser = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `UPDATE users
-          SET user_status = 'inactive'
-        WHERE user_id = $1
-        RETURNING user_id, username, email, user_status`,
-      [req.params.id]
-    );
-    if (!result.rows[0]) return res.status(404).json({ error: "Usuario no encontrado" });
-    return res.json({ message: "Usuario desactivado", user: result.rows[0] });
+    await client.query("BEGIN");
+    const result = await deactivateUserAccount(client, req.params.id);
+    if (!result) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    await client.query("COMMIT");
+    return res.json({
+      message: "Usuario desactivado",
+      user: result.user,
+      cancelledBookings: result.cancelledBookings,
+    });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error(error);
     return res.status(500).json({ error: "Error al desactivar usuario" });
+  } finally {
+    client.release();
   }
 };
 
 const deactivateMyAccount = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `UPDATE users
-          SET user_status = 'inactive'
-        WHERE user_id = $1
-        RETURNING user_id, username, email, user_status`,
-      [req.user.id]
-    );
-    if (!result.rows[0]) return res.status(404).json({ error: "Usuario no encontrado" });
+    await client.query("BEGIN");
+    const result = await deactivateUserAccount(client, req.user.id);
+    if (!result) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+    await client.query("COMMIT");
     return res.json({
       message: "Tu cuenta ha sido desactivada correctamente",
-      user: result.rows[0],
+      user: result.user,
+      cancelledBookings: result.cancelledBookings,
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error(error);
     return res.status(500).json({ error: "Error al desactivar tu cuenta" });
+  } finally {
+    client.release();
   }
 };
 
