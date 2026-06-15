@@ -159,7 +159,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
           <div style={styles.confirmModal}>
             <h3 style={styles.confirmTitle}>Plan activo</h3>
             <p style={styles.confirmText}>
-              Todavía tenés un plan activo. Podrás renovarlo o cambiarlo <strong>5 días antes del vencimiento</strong>, el <strong>{formatDate(membership?.plan_expiration_date ? new Date(new Date(membership.plan_expiration_date).getTime() - 4 * 24 * 60 * 60 * 1000) : null)}</strong>.
+              Todavía tenés un plan activo. Podrás renovarlo o cambiarlo <strong>5 días antes del vencimiento</strong>, el <strong>{formatDate(membership?.plan_expiration_date ? new Date(new Date(membership.plan_expiration_date).getTime() - 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10) : null)}</strong>.
             </p>
             <div style={styles.confirmActions}>
               <button onClick={() => setTooEarlyModal(false)} style={styles.primaryButton2}>Entendido</button>
