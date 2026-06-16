@@ -15,6 +15,8 @@ const calculateExpirationDate = (plan, fromDate = new Date()) => {
 
 const getMyPayments = async (req, res) => {
   try {
+    await syncPendingPayments(req.user.id);
+
     const [membershipResult, paymentsResult] = await Promise.all([
       pool.query(
         `SELECT u.plan_id, u.plan_expiration_date, p.plan_type
@@ -150,13 +152,7 @@ const createCheckout = async (req, res) => {
           currency_id: "ARS",
         }],
         external_reference: externalReference,
-        back_urls: {
-          success: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=success&ngrok-skip-browser-warning=true`,
-          failure: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=failure&ngrok-skip-browser-warning=true`,
-          pending: `${process.env.BACKEND_PUBLIC_URL}/payments/return?result=pending&ngrok-skip-browser-warning=true`,
-        },
         notification_url: `${process.env.BACKEND_PUBLIC_URL}/payments/webhook`,
-        auto_return: "approved",
       },
       externalReference
     );
@@ -265,6 +261,45 @@ const processPayment = async (paymentId) => {
   }
 };
 
+const syncPendingPayments = async (userId = null) => {
+  if (!process.env.MP_ACCESS_TOKEN) return;
+
+  const params = [];
+  const userCondition = userId ? "AND user_id = $1" : "";
+  if (userId) params.push(userId);
+
+  const pendingResult = await pool.query(
+    `SELECT payment_id, external_reference
+       FROM payments
+      WHERE payment_status = 'pending'
+        AND external_reference IS NOT NULL
+        ${userCondition}
+      ORDER BY payment_date DESC
+      LIMIT 20`,
+    params
+  );
+
+  for (const localPayment of pendingResult.rows) {
+    try {
+      const searchResult = await mercadoPago.searchPaymentsByExternalReference(
+        localPayment.external_reference
+      );
+      const remotePayments = searchResult.results || [];
+      const remotePayment = remotePayments.find((payment) => payment.status === "approved")
+        || remotePayments.find((payment) => payment.status && payment.status !== "pending");
+
+      if (remotePayment?.id) {
+        await processPayment(remotePayment.id);
+      }
+    } catch (error) {
+      console.error(
+        `No se pudo sincronizar el pago pendiente ${localPayment.payment_id}:`,
+        error.message
+      );
+    }
+  }
+};
+
 const paymentReturn = async (req, res) => {
   const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
   const paymentId = req.query.payment_id || req.query.collection_id;
@@ -303,6 +338,8 @@ const webhook = async (req, res) => {
 
 const getAllPayments = async (req, res) => {
   try {
+    await syncPendingPayments();
+
     const { user_id, status, date_from, date_to } = req.query;
     const conditions = ["pay.external_reference IS NOT NULL"];
     const params = [];

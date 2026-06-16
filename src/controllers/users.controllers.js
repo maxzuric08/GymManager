@@ -68,11 +68,12 @@ function databaseErrorResponse(error, res, action) {
 const getUsers = async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT user_id, branch_id, plan_id, username, dni, first_name, last_name,
-             email, phone, user_status, birth_date, registration_date,
-             plan_expiration_date
-        FROM users
-       ORDER BY user_id ASC
+      SELECT u.user_id, u.branch_id, u.plan_id, p.plan_type, u.username, u.dni,
+             u.first_name, u.last_name, u.email, u.phone, u.user_status,
+             u.birth_date, u.registration_date, u.plan_expiration_date
+        FROM users u
+        LEFT JOIN plans p ON p.plan_id = u.plan_id
+       ORDER BY u.user_id ASC
     `);
     res.json(result.rows);
   } catch (error) {

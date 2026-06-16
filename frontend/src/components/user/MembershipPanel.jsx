@@ -49,15 +49,38 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
 
   useEffect(() => { loadPayments(); }, [loadPayments]);
 
+  const hasPendingPayment = data?.payments?.some(
+    (payment) => payment.payment_status === "pending"
+  );
+
+  useEffect(() => {
+    if (!hasPendingPayment) return undefined;
+    const intervalId = setInterval(loadPayments, 5000);
+    return () => clearInterval(intervalId);
+  }, [hasPendingPayment, loadPayments]);
+
   const payPlan = async (plan) => {
     setConfirmPlan(null);
     setWorking(true);
     setError("");
+    const checkoutWindow = window.open("about:blank", "_blank");
+    if (checkoutWindow) {
+      checkoutWindow.document.write("Abriendo MercadoPago...");
+      checkoutWindow.document.close();
+    }
     try {
       const result = await createCheckoutRequest(plan.plan_id);
       if (!result.checkoutUrl) throw new Error("Mercado Pago no devolvio el enlace de pago");
-      window.location.assign(result.checkoutUrl);
+      if (checkoutWindow) {
+        checkoutWindow.location.assign(result.checkoutUrl);
+        checkoutWindow.focus();
+      } else {
+        window.location.assign(result.checkoutUrl);
+      }
+      await loadPayments();
+      setWorking(false);
     } catch (err) {
+      if (checkoutWindow) checkoutWindow.close();
       setError(err.message);
       setWorking(false);
     }
@@ -102,6 +125,12 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
         </div>
         <p style={styles.notice}>Los planes se pagan una vez. Cuando venza, podés renovarlo manualmente.</p>
       </section>
+
+      {hasPendingPayment && (
+        <p style={styles.pendingNotice}>
+          Pago pendiente de confirmacion. Si ya pagaste, estamos verificandolo automaticamente.
+        </p>
+      )}
 
       <h2 style={styles.sectionTitle}>Planes disponibles</h2>
       <div style={styles.grid}>
@@ -188,6 +217,7 @@ const styles = {
   muted: { color: "#64748b" },
   expiryWarning: { margin: "8px 0 0", color: "#92400e", background: "#fef3c7", padding: "6px 10px", borderRadius: "6px", fontSize: "0.88rem", fontWeight: 600 },
   notice: { maxWidth: "420px", margin: 0, color: "#475569" },
+  pendingNotice: { margin: "1rem 0 0", padding: "10px 12px", borderRadius: "6px", background: "#eff6ff", color: "#1d4ed8", fontWeight: 600 },
   sectionTitle: { marginTop: "2rem", color: "#0f172a" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "1rem" },
   card: { background: "white", padding: "1.25rem", border: "1px solid #e2e8f0", borderRadius: "8px", position: "relative", overflow: "hidden" },

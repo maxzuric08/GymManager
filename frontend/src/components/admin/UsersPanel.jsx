@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Modal from "../Modal";
 import {
   getUsersRequest,
+  getPlansRequest,
   createUserRequest,
   updateUserRequest,
   deleteUserRequest,
@@ -11,6 +12,7 @@ import {
 
 export default function UsersPanel() {
   const [users, setUsers] = useState([]);
+  const [plans, setPlans] = useState([]);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -31,8 +33,18 @@ export default function UsersPanel() {
     }
   };
 
+  const fetchPlans = async () => {
+    try {
+      const data = await getPlansRequest();
+      setPlans(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchPlans();
   }, []);
 
   const handleInputChange = (e) => {
@@ -137,6 +149,14 @@ export default function UsersPanel() {
     }
   };
 
+  const getPlanName = (user) => {
+    if (user.plan_type) return user.plan_type;
+    if (!user.plan_id) return "Sin plan";
+
+    const plan = plans.find((item) => Number(item.plan_id) === Number(user.plan_id));
+    return plan?.plan_type || "Sin plan";
+  };
+
   const handleRemoveMembership = (userId) => {
     setModal({
       isOpen: true,
@@ -239,18 +259,21 @@ export default function UsersPanel() {
         <tbody>
           {users.map((user) => (
             <tr key={user.user_id}>
-              <td style={styles.td}>{user.user_id}</td><td style={styles.td}>{user.username}</td><td style={styles.td}>{user.first_name} {user.last_name}</td><td style={styles.td}>{user.email}</td><td style={styles.td}>{user.dni}</td><td style={styles.td}>{user.user_status}</td>
+              <td style={styles.td}>{user.user_id}</td><td style={styles.td}>{user.username}</td><td style={styles.td}>{user.first_name} {user.last_name}</td><td style={styles.td}>{user.email}</td><td style={styles.td}>{user.dni}</td>
+              <td style={styles.td}>
+                <span style={user.user_status === "active" ? styles.activeBadge : styles.inactiveBadge}>
+                  {user.user_status === "active" ? "Activo" : "Inactivo"}
+                </span>
+                <div style={user.plan_id ? styles.planBadge : styles.noPlanBadge}>
+                  {getPlanName(user)}
+                </div>
+              </td>
               <td style={styles.td}>
                 <button onClick={() => handleEdit(user)} style={styles.editBtn}>Editar</button>
                 {user.user_status === 'inactive' ? (
                   <button onClick={() => handleReactivateUser(user.user_id)} style={styles.reactivateBtn}>Reactivar</button>
                 ) : (
-                  <>
-                    {user.plan_id && (
-                      <button onClick={() => handleRemoveMembership(user.user_id)} style={styles.warningBtn}>Sin plan</button>
-                    )}
-                    <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>Desactivar</button>
-                  </>
+                  <button onClick={() => setUserToDelete(user)} style={styles.deleteBtn}>Desactivar</button>
                 )}
               </td>
             </tr>
@@ -302,6 +325,28 @@ const styles = {
   reactivateBtn: { background: "#22c55e", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   warningBtn: { background: "#f59e0b", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   deleteBtn: { background: "#ef4444", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", cursor: "pointer" },
+  activeBadge: { display: "inline-block", background: "#dcfce7", color: "#166534", padding: "3px 9px", borderRadius: "999px", fontSize: "0.8rem", fontWeight: 700 },
+  inactiveBadge: { display: "inline-block", background: "#fee2e2", color: "#991b1b", padding: "3px 9px", borderRadius: "999px", fontSize: "0.8rem", fontWeight: 700 },
+  planBadge: {
+    display: "inline-block",
+    marginTop: "6px",
+    background: "#dbeafe",
+    color: "#1e40af",
+    padding: "3px 9px",
+    borderRadius: "999px",
+    fontSize: "0.8rem",
+    fontWeight: 700,
+  },
+  noPlanBadge: {
+    display: "inline-block",
+    marginTop: "6px",
+    background: "#f1f5f9",
+    color: "#64748b",
+    padding: "3px 9px",
+    borderRadius: "999px",
+    fontSize: "0.8rem",
+    fontWeight: 700,
+  },
   modalOverlay: { position: "fixed", top: 0, left: 0, width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 999 },
   modal: { backgroundColor: "white", padding: "2rem", borderRadius: "16px", width: "420px", maxWidth: "90%", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" },
   modalTitle: { marginTop: 0, marginBottom: "1rem", fontSize: "1.4rem" },

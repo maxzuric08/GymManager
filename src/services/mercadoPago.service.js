@@ -17,6 +17,15 @@ const getPayment = async (id) => {
   return payment.get({ id });
 };
 
+const searchPaymentsByExternalReference = async (externalReference) => {
+  const payment = new Payment(getClient());
+  return payment.search({
+    options: {
+      external_reference: externalReference,
+    },
+  });
+};
+
 const validateWebhookSignature = (req) => {
   if (!process.env.MP_WEBHOOK_SECRET) {
     throw new Error("Falta configurar MP_WEBHOOK_SECRET");
@@ -35,6 +44,7 @@ const isInvalidWebhookSignature = (error) => error instanceof InvalidWebhookSign
 module.exports = {
   createPreference,
   getPayment,
+  searchPaymentsByExternalReference,
   validateWebhookSignature,
   isInvalidWebhookSignature,
 };
