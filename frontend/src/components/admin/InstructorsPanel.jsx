@@ -44,7 +44,13 @@ export default function InstructorsPanel() {
 
     if (formData.available_from && formData.available_to) {
       if (formData.available_from >= formData.available_to) {
-        alert("La hora 'Disponible Hasta' debe ser estrictamente mayor a 'Disponible Desde'.");
+        setModal({
+          isOpen: true,
+          title: "Error",
+          message: "La hora 'Disponible Hasta' debe ser estrictamente mayor a 'Disponible Desde'.",
+          type: "error",
+          onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
+        });
         return; 
       }
     }
@@ -125,7 +131,13 @@ export default function InstructorsPanel() {
       await reactivateInstructorRequest(instructorId);
       fetchInstructors();
     } catch (err) {
-      alert(err.message);
+      setModal({
+        isOpen: true,
+        title: "Error",
+        message: err.message,
+        type: "error",
+        onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
+      });
     }
   };
 
@@ -148,7 +160,16 @@ export default function InstructorsPanel() {
         </button>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>

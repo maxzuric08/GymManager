@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Modal from "../components/Modal";
 import { loginRequest } from "../services/api";
 
 export default function Login() {
@@ -100,7 +101,16 @@ export default function Login() {
         </form>
 
         {message && <p style={styles.success}>{message}</p>}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && (
+          <Modal
+            isOpen={Boolean(error)}
+            title="Error"
+            message={error}
+            type="error"
+            confirmText="Aceptar"
+            onConfirm={() => setError("")}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Modal from "../Modal";
 
 const getClassDisplayStatus = (cls) => {
   const dateStr = cls.class_date ? cls.class_date.slice(0, 10) : null;
@@ -28,6 +29,22 @@ export default function ClassesPanel() {
   const [studentsModal, setStudentsModal] = useState(null);
   const [studentsData, setStudentsData] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "error",
+  });
+
+  const showError = (message) => {
+    setError("");
+    setFeedbackModal({
+      isOpen: true,
+      title: "Error",
+      message,
+      type: "error",
+    });
+  };
 
   const openStudentsModal = async (cls) => {
     setStudentsModal(cls);
@@ -37,7 +54,7 @@ export default function ClassesPanel() {
       const data = await getClassStudentsRequest(cls.class_id);
       setStudentsData(data.students || data);
     } catch (err) {
-      setError(err.message);
+      showError(err.message);
       setStudentsModal(null);
     } finally {
       setLoadingStudents(false);
@@ -60,7 +77,7 @@ export default function ClassesPanel() {
       const data = await getClassesRequest();
       setClasses(data);
     } catch (err) {
-      setError(err.message);
+      showError(err.message);
     }
   };
 
@@ -124,7 +141,7 @@ export default function ClassesPanel() {
       setClassToDelete(null);
       fetchClasses();
     } catch (err) {
-      setError(err.message);
+      showError(err.message);
     }
   };
 
@@ -133,7 +150,7 @@ export default function ClassesPanel() {
       await reactivateClassRequest(classId);
       fetchClasses();
     } catch (err) {
-      setError(err.message);
+      showError(err.message);
     }
   };
 
@@ -141,22 +158,22 @@ const handleSubmit = async (e) => {
   e.preventDefault();
 
   if (!formData.instructor_id) {
-    alert("Debes seleccionar un instructor");
+    showError("Debes seleccionar un instructor");
     return;
   }
 
   if (!formData.class_name.trim()) {
-    alert("Debes ingresar un nombre para la clase");
+    showError("Debes ingresar un nombre para la clase");
     return;
   }
 
   if (Number(formData.capacity) <= 0) {
-    alert("La capacidad debe ser mayor a 0");
+    showError("La capacidad debe ser mayor a 0");
     return;
   }
 
   if (!formData.class_date) {
-    alert("Debes seleccionar una fecha");
+    showError("Debes seleccionar una fecha");
     return;
   }
 
@@ -164,17 +181,17 @@ const handleSubmit = async (e) => {
   const todayStr = today.toISOString().split("T")[0];
 
   if (formData.class_date < todayStr) {
-    alert("No puedes crear una clase en una fecha pasada");
+    showError("No puedes crear una clase en una fecha pasada");
     return;
   }
 
   if (!formData.start_time || !formData.end_time) {
-    alert("Debes completar el horario");
+    showError("Debes completar el horario");
     return;
   }
 
   if (formData.end_time <= formData.start_time) {
-    alert("La hora de término debe ser mayor a la hora de inicio");
+    showError("La hora de término debe ser mayor a la hora de inicio");
     return;
   }
 
@@ -185,7 +202,7 @@ const handleSubmit = async (e) => {
       String(today.getMinutes()).padStart(2, "0");
 
     if (formData.start_time <= currentTime) {
-      alert("No puedes crear una clase hoy en una hora que ya pasó");
+      showError("No puedes crear una clase hoy en una hora que ya pasó");
       return;
     }
   }
@@ -222,7 +239,7 @@ const handleSubmit = async (e) => {
       status: "active",
     });
   } catch (err) {
-    alert(err.message);
+    showError(err.message);
   }
 };
 
@@ -265,7 +282,16 @@ const handleSubmit = async (e) => {
         </button>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
@@ -490,6 +516,15 @@ const handleSubmit = async (e) => {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={feedbackModal.isOpen}
+        title={feedbackModal.title}
+        message={feedbackModal.message}
+        type={feedbackModal.type}
+        confirmText="Aceptar"
+        onConfirm={() => setFeedbackModal({ ...feedbackModal, isOpen: false })}
+      />
     </div>
   );
 }

@@ -168,7 +168,16 @@ export default function PlansPanel() {
         </button>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>

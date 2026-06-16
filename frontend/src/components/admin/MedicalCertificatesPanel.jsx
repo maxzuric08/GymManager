@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Modal from "../Modal";
 import {
     getMedicalCertificatesRequest,
     reviewMedicalCertificateRequest,
@@ -89,7 +90,16 @@ export default function MedicalCertificatesPanel() {
             </div>
 
             {message && <p style={styles.success}>{message}</p>}
-            {error && <p style={styles.error}>{error}</p>}
+            {error && (
+                <Modal
+                    isOpen={Boolean(error)}
+                    title="Error"
+                    message={error}
+                    type="error"
+                    confirmText="Aceptar"
+                    onConfirm={() => setError("")}
+                />
+            )}
 
             <table style={styles.table}>
                 <thead>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Modal from "../Modal";
 import { getAllPaymentsAdminRequest } from "../../services/api";
 
 const STATUS_OPTIONS = [
@@ -102,7 +103,16 @@ export default function PaymentsPanel() {
         </div>
       </div>
 
-      {error && <p style={styles.error}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       <div style={styles.metrics}>
         <Metric label="Total pagos"  value={stats.total || 0} />

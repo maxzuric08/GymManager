@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MembershipPanel from "../components/user/MembershipPanel";
+import Modal from "../components/Modal";
 import {
   getPlansRequest,
   logoutRequest,
@@ -304,7 +305,16 @@ export default function UserDashboard() {
         </div>
 
         {message && <p style={styles.success}>{message}</p>}
-        {error && <p style={styles.error}>{error}</p>}
+        {error && (
+          <Modal
+            isOpen={Boolean(error)}
+            title="Error"
+            message={error}
+            type="error"
+            confirmText="Aceptar"
+            onConfirm={() => setError("")}
+          />
+        )}
 
         {activeTab === "classes" && (
             <div>

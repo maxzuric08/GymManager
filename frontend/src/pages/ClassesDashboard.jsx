@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Modal from "../components/Modal";
 import { getClassesRequest, createClassRequest } from "../services/api";
 
 export default function ClassesDashboard() {
@@ -41,7 +42,7 @@ export default function ClassesDashboard() {
       fetchClasses(); // Recargamos la tabla
       setFormData({ instructor_id: 1, branch_id: 1, class_name: "", capacity: 20, start_time: "", end_time: "", class_date: "" });
     } catch {
-      alert("Error al crear: Probablemente el ID del profesor no exista en la base de datos.");
+      setError("Error al crear: Probablemente el ID del profesor no exista en la base de datos.");
     }
   };
 
@@ -61,7 +62,16 @@ export default function ClassesDashboard() {
         </button>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>

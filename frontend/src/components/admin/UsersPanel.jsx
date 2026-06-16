@@ -103,7 +103,13 @@ export default function UsersPanel() {
         onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
       });
     } catch (err) {
-      alert(err.message);
+      setModal({
+        isOpen: true,
+        title: "Error",
+        message: err.message,
+        type: "error",
+        onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
+      });
     }
   };
 
@@ -121,7 +127,13 @@ export default function UsersPanel() {
       await reactivateUserRequest(userId);
       fetchUsers();
     } catch (err) {
-      alert(err.message);
+      setModal({
+        isOpen: true,
+        title: "Error",
+        message: err.message,
+        type: "error",
+        onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
+      });
     }
   };
 
@@ -176,7 +188,16 @@ export default function UsersPanel() {
         </button>
       </div>
 
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>

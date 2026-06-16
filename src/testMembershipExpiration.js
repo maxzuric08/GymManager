@@ -28,7 +28,7 @@ const testMembershipExpiration = async () => {
         "password123",
         "Usuario",
         "Prueba",
-        "renkineluciano1@gmail.com",  // 👈 CAMBIAR A TU EMAIL
+        "maxzuric.08@gmail.com",  // 👈 CAMBIAR A TU EMAIL
         randomDni,
         testPlanId,
         new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] // Mañana

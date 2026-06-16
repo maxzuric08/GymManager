@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Modal from "../Modal";
 import { createCheckoutRequest, getMyPaymentsRequest } from "../../services/api";
 
 const money = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" });
@@ -79,7 +80,16 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
 
   return (
     <div>
-      {error && <p style={styles.error}>{error}</p>}
+      {error && (
+        <Modal
+          isOpen={Boolean(error)}
+          title="Error"
+          message={error}
+          type="error"
+          confirmText="Aceptar"
+          onConfirm={() => setError("")}
+        />
+      )}
 
       <section style={styles.summary}>
         <div>

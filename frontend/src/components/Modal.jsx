@@ -27,9 +27,11 @@ export default function Modal({
         <p style={styles.modalText}>{message}</p>
 
         <div style={styles.modalActions}>
-          <button onClick={onCancel} style={styles.cancelBtn}>
-            {cancelText}
-          </button>
+          {onCancel && (
+            <button onClick={onCancel} style={styles.cancelBtn}>
+              {cancelText}
+            </button>
+          )}
           <button onClick={onConfirm} style={{ ...styles.confirmBtn, backgroundColor: colorMap[type] }}>
             {confirmText}
           </button>
