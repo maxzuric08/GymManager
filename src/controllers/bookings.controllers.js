@@ -1,4 +1,8 @@
 const pool = require("../db");
+const { getArgentinaDate } = require("../utils/argentinaTime");
+
+const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
+const ARGENTINA_SQL_TIME = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::time";
 
 const getUserBookings = async (req, res) => {
     try {
@@ -18,8 +22,8 @@ const getUserBookings = async (req, res) => {
              WHERE b.user_id = $1
                AND b.status = 'confirmed'
                AND (
-                   c.class_date > CURRENT_DATE OR
-                   (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+                   c.class_date > ${ARGENTINA_SQL_DATE} OR
+                   (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time > ${ARGENTINA_SQL_TIME})
                )
              ORDER BY c.class_date ASC, c.start_time ASC`,
             [req.user.id]
@@ -74,10 +78,7 @@ const createBooking = async (req, res) => {
             return res.status(400).json({ error: "Necesitas una membresia vigente para reservar" });
         }
 
-        const expirationDate = new Date(user.plan_expiration_date);
-        expirationDate.setHours(23, 59, 59, 999);
-
-        if (expirationDate < new Date()) {
+        if (String(user.plan_expiration_date).slice(0, 10) < getArgentinaDate()) {
             await client.query("ROLLBACK");
             return res.status(400).json({ error: "Tu membresia esta vencida" });
         }
@@ -117,8 +118,8 @@ const createBooking = async (req, res) => {
         }
 
         const classAvailability = await client.query(
-            `SELECT ($1::date > CURRENT_DATE OR
-                    ($1::date = CURRENT_DATE AND $2::time > LOCALTIME)) AS available`,
+            `SELECT ($1::date > ${ARGENTINA_SQL_DATE} OR
+                    ($1::date = ${ARGENTINA_SQL_DATE} AND $2::time > ${ARGENTINA_SQL_TIME})) AS available`,
             [gymClass.class_date, gymClass.start_time]
         );
 
@@ -169,8 +170,8 @@ const createBooking = async (req, res) => {
                   WHERE b.user_id = $1
                     AND b.status = 'confirmed'
                     AND (
-                        c.class_date > CURRENT_DATE OR
-                        (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+                        c.class_date > ${ARGENTINA_SQL_DATE} OR
+                        (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time > ${ARGENTINA_SQL_TIME})
                     )`,
                 [req.user.id]
             );
@@ -227,8 +228,8 @@ const cancelBooking = async (req, res) => {
                      FROM classes c
                     WHERE c.class_id = bookings.class_id
                       AND (
-                          c.class_date > CURRENT_DATE OR
-                          (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)
+                          c.class_date > ${ARGENTINA_SQL_DATE} OR
+                          (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time > ${ARGENTINA_SQL_TIME})
                       )
                )
              RETURNING booking_id, user_id, class_id, booking_date, status`,
@@ -238,8 +239,8 @@ const cancelBooking = async (req, res) => {
         if (result.rows.length === 0) {
             const booking = await pool.query(
                 `SELECT b.booking_id,
-                        (c.class_date > CURRENT_DATE OR
-                         (c.class_date = CURRENT_DATE AND c.start_time > LOCALTIME)) AS can_cancel
+                        (c.class_date > ${ARGENTINA_SQL_DATE} OR
+                         (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time > ${ARGENTINA_SQL_TIME})) AS can_cancel
                    FROM bookings b
                    JOIN classes c ON c.class_id = b.class_id
                   WHERE b.booking_id = $1 AND b.user_id = $2 AND b.status = 'confirmed'`,

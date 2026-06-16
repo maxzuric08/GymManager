@@ -14,6 +14,7 @@ import {
   openMedicalCertificateFile,
   getMyPaymentsRequest,
 } from "../services/api";
+import { isFutureClassSlot } from "../utils/argentinaTime";
 
 export default function UserDashboard() {
   const navigate = useNavigate();
@@ -65,9 +66,7 @@ export default function UserDashboard() {
       const filteredClasses = classesData.filter(
           (gymClass) => {
             if (!["active", "scheduled"].includes(gymClass.status)) return false;
-            const classDate = gymClass.class_date.slice(0, 10);
-            const start = new Date(`${classDate}T${gymClass.start_time}`);
-            return start > new Date();
+            return isFutureClassSlot(gymClass.class_date, gymClass.start_time);
           }
       );
       setClasses(filteredClasses);

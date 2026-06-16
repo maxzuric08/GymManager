@@ -10,6 +10,7 @@ import {
   updateMyAvailabilityRequest,
   getClassStudentsRequest,
 } from "../services/api";
+import { getArgentinaDate, hasClassStarted } from "../utils/argentinaTime";
 
 const STATUS_LABELS = {
   present: { label: "Presente", color: "#22c55e" },
@@ -25,10 +26,7 @@ const getClassDisplayStatus = (cls, isPast) => {
   return { label: "Programada", style: "active" };
 };
 
-const formatInputDate = (date) => {
-  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return localDate.toISOString().slice(0, 10);
-};
+const formatInputDate = (date) => getArgentinaDate(date);
 
 const getClassDate = (value) => value?.slice(0, 10) || "";
 
@@ -49,7 +47,12 @@ export default function InstructorDashboard() {
   const [myClasses, setMyClasses] = useState([]);
   const [attendanceRegistered, setAttendanceRegistered] = useState({});
   const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "error" });
-  const [availability, setAvailability] = useState({ from: user.available_from?.slice(0, 5) || "", to: user.available_to?.slice(0, 5) || "" });
+  const initialAvailability = {
+    from: user.available_from?.slice(0, 5) || "",
+    to: user.available_to?.slice(0, 5) || "",
+  };
+  const [savedAvailability, setSavedAvailability] = useState(initialAvailability);
+  const [availabilityDraft, setAvailabilityDraft] = useState(initialAvailability);
   const [editingAvailability, setEditingAvailability] = useState(false);
   const [savingAvailability, setSavingAvailability] = useState(false);
 
@@ -191,12 +194,19 @@ export default function InstructorDashboard() {
   const handleSaveAvailability = async () => {
     setSavingAvailability(true);
     try {
-      const result = await updateMyAvailabilityRequest(availability.from, availability.to);
+      const result = await updateMyAvailabilityRequest(availabilityDraft.from, availabilityDraft.to);
+      const nextAvailability = {
+        from: result.instructor.available_from?.slice(0, 5) || "",
+        to: result.instructor.available_to?.slice(0, 5) || "",
+      };
       const updatedUser = { ...user, available_from: result.instructor.available_from, available_to: result.instructor.available_to };
       localStorage.setItem("user", JSON.stringify(updatedUser));
+      setSavedAvailability(nextAvailability);
+      setAvailabilityDraft(nextAvailability);
       setEditingAvailability(false);
       setModal({ isOpen: true, title: "Listo", message: "Disponibilidad actualizada correctamente.", type: "success" });
     } catch (err) {
+      setAvailabilityDraft(savedAvailability);
       setModal({ isOpen: true, title: "Error", message: err.message, type: "error" });
     } finally {
       setSavingAvailability(false);
@@ -213,8 +223,6 @@ export default function InstructorDashboard() {
 
   const summary = overview.summary || {};
   const today = formatInputDate(currentDateTime);
-  const currentTime = currentDateTime.toTimeString().slice(0, 8);
-
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -230,29 +238,35 @@ export default function InstructorDashboard() {
           <div>
             <strong>Mi disponibilidad</strong>
             {!editingAvailability && (
-              <span style={{ marginLeft: "12px", color: availability.from && availability.to ? "#334155" : "#94a3b8" }}>
-                {availability.from && availability.to ? `${availability.from} a ${availability.to} hs` : "Sin horarios configurados"}
+              <span style={{ marginLeft: "12px", color: savedAvailability.from && savedAvailability.to ? "#334155" : "#94a3b8" }}>
+                {savedAvailability.from && savedAvailability.to ? `${savedAvailability.from} a ${savedAvailability.to} hs` : "Sin horarios configurados"}
               </span>
             )}
           </div>
           {!editingAvailability ? (
-            <button onClick={() => setEditingAvailability(true)} style={styles.editAvailBtn}>
-              {availability.from ? "Editar" : "Configurar horarios"}
+            <button onClick={() => {
+              setAvailabilityDraft(savedAvailability);
+              setEditingAvailability(true);
+            }} style={styles.editAvailBtn}>
+              {savedAvailability.from ? "Editar" : "Configurar horarios"}
             </button>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
               <label style={styles.timeLabel}>
                 Desde
-                <input type="time" value={availability.from} onChange={(e) => setAvailability({ ...availability, from: e.target.value })} style={styles.timeInput} />
+                <input type="time" value={availabilityDraft.from} onChange={(e) => setAvailabilityDraft({ ...availabilityDraft, from: e.target.value })} style={styles.timeInput} />
               </label>
               <label style={styles.timeLabel}>
                 Hasta
-                <input type="time" value={availability.to} onChange={(e) => setAvailability({ ...availability, to: e.target.value })} style={styles.timeInput} />
+                <input type="time" value={availabilityDraft.to} onChange={(e) => setAvailabilityDraft({ ...availabilityDraft, to: e.target.value })} style={styles.timeInput} />
               </label>
               <button onClick={handleSaveAvailability} disabled={savingAvailability} style={styles.saveAvailBtn}>
                 {savingAvailability ? "Guardando..." : "Guardar"}
               </button>
-              <button onClick={() => setEditingAvailability(false)} style={styles.cancelAvailBtn}>Cancelar</button>
+              <button onClick={() => {
+                setAvailabilityDraft(savedAvailability);
+                setEditingAvailability(false);
+              }} style={styles.cancelAvailBtn}>Cancelar</button>
             </div>
           )}
         </div>
@@ -278,7 +292,7 @@ export default function InstructorDashboard() {
               const classDate = getClassDate(cls.class_date);
               const isPast = classDate < today;
               const isToday = classDate === today;
-              const hasStarted = isToday && cls.start_time <= currentTime;
+              const hasStarted = hasClassStarted(classDate, cls.start_time, currentDateTime);
               const hasAttendance = attendanceRegistered[cls.class_id];
               return (
                 <div key={cls.class_id} style={{

@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { getArgentinaDate, getArgentinaTimeShort } = require("../utils/argentinaTime");
 
 function validateClassDateTime(classDate, startTime, endTime) {
   if (!classDate) return "Debes ingresar una fecha para la clase";
@@ -6,13 +7,12 @@ function validateClassDateTime(classDate, startTime, endTime) {
   if (endTime <= startTime) return "La hora de termino debe ser mayor a la hora de inicio";
 
   const now = new Date();
-  const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  const today = localNow.toISOString().split("T")[0];
+  const today = getArgentinaDate(now);
 
   if (classDate < today) return "No se pueden crear o actualizar clases en fechas pasadas";
 
   if (classDate === today) {
-    const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    const currentTime = getArgentinaTimeShort(now);
     if (startTime <= currentTime) return "No se puede programar una clase hoy en una hora ya pasada";
   }
 

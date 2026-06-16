@@ -1,4 +1,8 @@
 const pool = require("../db");
+const { getArgentinaDate } = require("../utils/argentinaTime");
+
+const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
+const ARGENTINA_SQL_TIME = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::time";
 
 function validateAvailability(availableFrom, availableTo) {
   const hasStart = Boolean(availableFrom);
@@ -16,7 +20,7 @@ function validateInstructorData({ username, dni, first_name, last_name, phone, e
   if (last_name && !/^[\p{L}\s]+$/u.test(last_name)) return "El apellido solo puede contener letras";
   if (phone && !/^[\d\s-]+$/.test(phone)) return "El telefono solo admite numeros, guiones y espacios";
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Debes ingresar un email valido";
-  if (birth_date && birth_date > new Date().toISOString().split("T")[0]) {
+  if (birth_date && birth_date > getArgentinaDate()) {
     return "La fecha de nacimiento no puede ser futura";
   }
   return validateAvailability(available_from, available_to);
@@ -28,8 +32,8 @@ async function findFutureScheduleConflict(instructorId, availableFrom, available
       FROM classes
       WHERE instructor_id = $1
         AND (
-          class_date > CURRENT_DATE OR
-          (class_date = CURRENT_DATE AND start_time > LOCALTIME)
+          class_date > ${ARGENTINA_SQL_DATE} OR
+          (class_date = ${ARGENTINA_SQL_DATE} AND start_time > ${ARGENTINA_SQL_TIME})
         )
         AND status NOT IN ('cancelled', 'inactive')
         AND (
@@ -136,7 +140,7 @@ async function findNextFutureClass(instructorId) {
     `SELECT class_name, class_date, start_time
        FROM classes
       WHERE instructor_id = $1
-        AND class_date >= CURRENT_DATE
+        AND class_date >= ${ARGENTINA_SQL_DATE}
         AND status NOT IN ('cancelled', 'inactive')
       ORDER BY class_date, start_time
       LIMIT 1`,

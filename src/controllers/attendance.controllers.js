@@ -1,4 +1,8 @@
 const pool = require("../db");
+const { getArgentinaDate } = require("../utils/argentinaTime");
+
+const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
+const ARGENTINA_SQL_TIME = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::time";
 
 const VALID_STATUSES = ["present", "absent", "late", "excused"];
 
@@ -89,8 +93,8 @@ const saveClassAttendance = async (req, res) => {
 
         const availability = await client.query(
             `SELECT (
-                $1::date < CURRENT_DATE
-                OR ($1::date = CURRENT_DATE AND $2::time <= LOCALTIME)
+                $1::date < ${ARGENTINA_SQL_DATE}
+                OR ($1::date = ${ARGENTINA_SQL_DATE} AND $2::time <= ${ARGENTINA_SQL_TIME})
             ) AS available`,
             [gymClass.class_date, gymClass.start_time]
         );
@@ -187,8 +191,8 @@ const getAttendanceOverview = async (req, res) => {
             return res.status(400).json({ error: "Formato de fecha invalido" });
         }
 
-        const from = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-        const to = date_to || new Date().toISOString().slice(0, 10);
+        const from = date_from || getArgentinaDate(new Date(Date.now() - 30 * 86400000));
+        const to = date_to || getArgentinaDate();
 
         if (from > to) {
             return res.status(400).json({ error: "La fecha desde no puede ser posterior a la fecha hasta" });
@@ -219,8 +223,8 @@ const getAttendanceOverview = async (req, res) => {
              WHERE c.class_date BETWEEN $1 AND $2
                AND c.status NOT IN ('cancelled', 'inactive')
                AND (
-                   c.class_date < CURRENT_DATE
-                   OR (c.class_date = CURRENT_DATE AND c.start_time <= LOCALTIME)
+                   c.class_date < ${ARGENTINA_SQL_DATE}
+                   OR (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time <= ${ARGENTINA_SQL_TIME})
                )
              GROUP BY c.class_id, i.instructor_id
              ORDER BY c.class_date DESC, c.start_time DESC`,
@@ -339,7 +343,7 @@ const saveInstructorClassAttendance = async (req, res) => {
         }
 
         const availability = await client.query(
-            `SELECT ($1::date = CURRENT_DATE AND $2::time <= LOCALTIME) AS available`,
+            `SELECT ($1::date = ${ARGENTINA_SQL_DATE} AND $2::time <= ${ARGENTINA_SQL_TIME}) AS available`,
             [gymClass.class_date, gymClass.start_time]
         );
         if (!availability.rows[0].available) {
@@ -397,8 +401,8 @@ const getInstructorAttendanceHistory = async (req, res) => {
             return res.status(400).json({ error: "Formato de fecha invalido" });
         }
 
-        const from = date_from || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-        const to = date_to || new Date().toISOString().slice(0, 10);
+        const from = date_from || getArgentinaDate(new Date(Date.now() - 30 * 86400000));
+        const to = date_to || getArgentinaDate();
 
         if (from > to) {
             return res.status(400).json({ error: "La fecha desde no puede ser posterior a la fecha hasta" });
@@ -429,8 +433,8 @@ const getInstructorAttendanceHistory = async (req, res) => {
                AND c.class_date BETWEEN $2 AND $3
                AND c.status NOT IN ('cancelled', 'inactive')
                AND (
-                   c.class_date < CURRENT_DATE
-                   OR (c.class_date = CURRENT_DATE AND c.start_time <= LOCALTIME)
+                   c.class_date < ${ARGENTINA_SQL_DATE}
+                   OR (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time <= ${ARGENTINA_SQL_TIME})
                )
              GROUP BY c.class_id
              ORDER BY c.class_date DESC, c.start_time DESC`,

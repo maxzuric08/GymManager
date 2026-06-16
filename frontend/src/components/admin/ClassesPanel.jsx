@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import Modal from "../Modal";
+import { getArgentinaDate, getArgentinaTimeShort, hasClassStarted } from "../../utils/argentinaTime";
 
 const getClassDisplayStatus = (cls) => {
   const dateStr = cls.class_date ? cls.class_date.slice(0, 10) : null;
-  const isPast = dateStr ? new Date(`${dateStr}T${cls.end_time || "23:59:00"}`) < new Date() : false;
+  const isPast = dateStr ? hasClassStarted(dateStr, cls.end_time || "23:59:00") : false;
   if (cls.status === "cancelled") return { label: "Cancelada", color: "#b91c1c", bg: "#fee2e2" };
   if (cls.status === "inactive")  return { label: "Inactiva",  color: "#64748b", bg: "#f1f5f9" };
   if (isPast)                     return { label: "Dictada",   color: "#854d0e", bg: "#fef9c3" };
@@ -178,7 +179,7 @@ const handleSubmit = async (e) => {
   }
 
   const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
+  const todayStr = getArgentinaDate(today);
 
   if (formData.class_date < todayStr) {
     showError("No puedes crear una clase en una fecha pasada");
@@ -196,10 +197,7 @@ const handleSubmit = async (e) => {
   }
 
   if (formData.class_date === todayStr) {
-    const currentTime =
-      String(today.getHours()).padStart(2, "0") +
-      ":" +
-      String(today.getMinutes()).padStart(2, "0");
+    const currentTime = getArgentinaTimeShort(today);
 
     if (formData.start_time <= currentTime) {
       showError("No puedes crear una clase hoy en una hora que ya pasó");
@@ -323,7 +321,7 @@ const handleSubmit = async (e) => {
               value={formData.class_date}
               onChange={handleInputChange}
               required
-              min={new Date().toISOString().split("T")[0]}
+              min={getArgentinaDate()}
               style={styles.input}
             />
 
