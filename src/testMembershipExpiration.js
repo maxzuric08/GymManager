@@ -35,7 +35,7 @@ const testMembershipExpiration = async () => {
       ]
     );
     const testUserId = userResult.rows[0].user_id;
-    console.log(`✅ Usuario creado: ID ${testUserId}, Email: renkineluciano1@gmail.com\n`);
+    console.log(`✅ Usuario creado: ID ${testUserId}, Email: maxzuric.08@gmail.comn`);
 
     // 3. Enviar notificaciones
     console.log("3️⃣ Enviando notificaciones...");
@@ -47,10 +47,10 @@ const testMembershipExpiration = async () => {
     console.log(`   - Plan ID: ${testPlanId}`);
     console.log(`   - Usuario ID: ${testUserId}`);
     console.log(`   - Vencimiento: Mañana (${new Date(new Date().setDate(new Date().getDate() + 1)).toLocaleDateString('es-AR')})`);
-    console.log(`   - Email: renkineluciano1@gmail.com\n`);
+    console.log(`   - Email: maxzuric.08@gmail.com\n`);
 
     console.log("✅ Prueba completada!\n");
-    console.log("Nota: Revisa tu email en renkineluciano1@gmail.com para ver la notificación");
+    console.log("Nota: Revisa tu email en maxzuric.08@gmail.com para ver la notificación");
 
     process.exit(0);
   } catch (error) {
