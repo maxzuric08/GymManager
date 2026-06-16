@@ -1,3 +1,4 @@
+require("dotenv").config();
 const pool = require("./db");
 const { sendMembershipExpirationNotifications } = require("./controllers/notifications.controllers");
 
