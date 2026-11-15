@@ -1,34 +1,9 @@
 const pool = require("../db");
-
-// Función para calcular fecha de vencimiento basada en duration_value y duration_unit
-const calculateExpirationDate = (durationValue, durationUnit) => {
-  const today = new Date();
-  const expirationDate = new Date(today);
-
-  const value = parseInt(durationValue) || 1;
-  const unit = (durationUnit || 'months').toLowerCase();
-
-  switch (unit) {
-    case 'days':
-    case 'día':
-    case 'días':
-      expirationDate.setDate(expirationDate.getDate() + value);
-      break;
-    case 'weeks':
-    case 'semana':
-    case 'semanas':
-      expirationDate.setDate(expirationDate.getDate() + (value * 7));
-      break;
-    case 'months':
-    case 'mes':
-    case 'meses':
-    default:
-      expirationDate.setMonth(expirationDate.getMonth() + value);
-      break;
-  }
-
-  return expirationDate.toISOString().split('T')[0];
-};
+const {
+  assignMembership,
+  getActivePlan,
+  notifyMembershipConfirmation,
+} = require("../services/membership.service");
 
 const getPlans =  async (req, res) => {
     try {
@@ -107,6 +82,7 @@ const updatePlan =  async (req, res) => {
 };
 
 const updateUserPlan = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const { plan_id } = req.body;
@@ -115,35 +91,36 @@ const updateUserPlan = async (req, res) => {
       return res.status(400).json({ error: "Debes seleccionar un plan" });
     }
 
-    const planExists = await pool.query(
-      "SELECT * FROM plans WHERE plan_id = $1 AND status = 'active'",
-      [plan_id]
-    );
-
-    if (planExists.rows.length === 0) {
+    await client.query("BEGIN");
+    const plan = await getActivePlan(client, plan_id);
+    if (!plan) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Plan no encontrado o inactivo" });
     }
 
-    // Calcular fecha de vencimiento basada en la duración del plan
-    const plan = planExists.rows[0];
-    const expirationDate = calculateExpirationDate(plan.duration_value, plan.duration_unit);
-
-    const result = await pool.query(
-      "UPDATE users SET plan_id = $1, plan_expiration_date = $2 WHERE user_id = $3 RETURNING *",
-      [plan_id, expirationDate, id]
-    );
-
-    if (result.rows.length === 0) {
+    const membership = await assignMembership(client, { userId: id, plan });
+    if (!membership.user) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Usuario no encontrado" });
     }
+    await client.query("COMMIT");
+
+    await notifyMembershipConfirmation({
+      user: membership.user,
+      plan,
+      startDate: membership.startDate,
+    });
 
     res.json({
       message: "Membresía asignada correctamente",
-      user: result.rows[0],
+      user: membership.user,
     });
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
     console.error(error);
     res.status(500).json({ error: "Error al asignar membresía" });
+  } finally {
+    client.release();
   }
 };
 
