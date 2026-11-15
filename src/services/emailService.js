@@ -26,7 +26,7 @@ const sendMembershipExpirationEmail = async (userEmail, userName, planName, expi
           <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
             <p>Hola <strong>${userName}</strong>,</p>
 
-            <p>Queremos avisarte que tu plan <strong>${planName}</strong> vencerá el <strong>${new Date(expirationDate).toLocaleDateString('es-AR', { year: 'numeric', month: 'long', day: 'numeric' })}</strong>.</p>
+            <p>Queremos avisarte que tu plan <strong>${planName}</strong> vencerá el <strong>${new Date(`${String(expirationDate).slice(0, 10)}T12:00:00Z`).toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: 'long', day: 'numeric' })}</strong>.</p>
 
             <p style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; color: #856404;">
               ⚠️ Una vez venza tu membresía, no podrás reservar nuevas clases hasta que adquieras un nuevo plan.
@@ -52,10 +52,10 @@ const sendMembershipExpirationEmail = async (userEmail, userName, planName, expi
 
     await transporter.sendMail(mailOptions);
     console.log(`Email enviado a ${userEmail}`);
-    return true;
+    return { success: true };
   } catch (error) {
     console.error('Error enviando email:', error);
-    return false;
+    return { success: false, error: error.message };
   }
 };
 
