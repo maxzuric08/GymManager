@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "node --test",
-    "db:init": "psql -U postgres -d gymmanager -f ./database/gymmanager.sql"
+    "db:init": "psql -U postgres -d gymmanager -f ./database/gymmanager.sql",
+    "db:migrate": "node src/initDb.js"
   },
   "keywords": [],
   "author": "",
