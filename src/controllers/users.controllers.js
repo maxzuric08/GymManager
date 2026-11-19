@@ -1,4 +1,9 @@
 const pool = require("../db");
+const {
+  assignMembership,
+  getActivePlan,
+  notifyMembershipConfirmation,
+} = require("../services/membership.service");
 
 const VALID_USER_STATUSES = new Set(["active", "inactive"]);
 
@@ -22,35 +27,9 @@ function validateUserData(data, { passwordRequired = false } = {}) {
   return null;
 }
 
-function calculateExpirationDate(durationValue, durationUnit) {
-  const expirationDate = new Date();
-  const value = Number.parseInt(durationValue, 10) || 1;
-
-  if (durationUnit === "days") {
-    expirationDate.setDate(expirationDate.getDate() + value);
-  } else if (durationUnit === "weeks") {
-    expirationDate.setDate(expirationDate.getDate() + (value * 7));
-  } else {
-    expirationDate.setMonth(expirationDate.getMonth() + value);
-  }
-
-  return expirationDate.toISOString().split("T")[0];
-}
-
-async function getActivePlan(planId) {
-  if (!planId) return null;
-  const result = await pool.query(
-    `SELECT plan_id, duration_value, duration_unit
-       FROM plans
-      WHERE plan_id = $1 AND status = 'active'`,
-    [planId]
-  );
-  return result.rows[0] || null;
-}
-
-async function branchExists(branchId) {
+async function branchExists(branchId, client = pool) {
   if (!branchId) return true;
-  const result = await pool.query("SELECT 1 FROM branches WHERE branch_id = $1", [branchId]);
+  const result = await client.query("SELECT 1 FROM branches WHERE branch_id = $1", [branchId]);
   return Boolean(result.rows[0]);
 }
 
@@ -83,6 +62,7 @@ const getUsers = async (req, res) => {
 };
 
 const createUser = async (req, res) => {
+  const client = await pool.connect();
   try {
     const {
       branch_id, plan_id, username, password, dni, first_name, last_name,
@@ -92,19 +72,19 @@ const createUser = async (req, res) => {
     const validationError = validateUserData(req.body, { passwordRequired: true });
     if (validationError) return res.status(400).json({ error: validationError });
 
-    if (!(await branchExists(branch_id))) {
+    await client.query("BEGIN");
+    if (!(await branchExists(branch_id, client))) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "La sucursal seleccionada no existe" });
     }
 
-    const plan = await getActivePlan(plan_id);
+    const plan = await getActivePlan(client, plan_id);
     if (plan_id && !plan) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "El plan seleccionado no existe o esta inactivo" });
     }
-    const expirationDate = plan
-      ? calculateExpirationDate(plan.duration_value, plan.duration_unit)
-      : null;
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO users
         (branch_id, plan_id, username, password, dni, first_name, last_name,
          email, phone, birth_date, plan_expiration_date)
@@ -113,16 +93,29 @@ const createUser = async (req, res) => {
                  last_name, email, phone, user_status, birth_date,
                  registration_date, plan_expiration_date`,
       [branch_id || null, plan_id || null, username.trim(), password, dni,
-       first_name, last_name, email, phone, birth_date || null, expirationDate]
+       first_name, last_name, email, phone, birth_date || null, null]
     );
 
-    return res.status(201).json(result.rows[0]);
+    const membership = plan
+      ? await assignMembership(client, { userId: result.rows[0].user_id, plan })
+      : null;
+    await client.query("COMMIT");
+
+    const user = membership?.user || result.rows[0];
+    if (membership) {
+      await notifyMembershipConfirmation({ user, plan, startDate: membership.startDate });
+    }
+    return res.status(201).json(user);
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
     return databaseErrorResponse(error, res, "crear");
+  } finally {
+    client.release();
   }
 };
 
 const updateUser = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const {
@@ -133,32 +126,40 @@ const updateUser = async (req, res) => {
     const validationError = validateUserData(req.body);
     if (validationError) return res.status(400).json({ error: validationError });
 
-    const existingResult = await pool.query(
+    await client.query("BEGIN");
+    const existingResult = await client.query(
       "SELECT user_id, plan_id, plan_expiration_date FROM users WHERE user_id = $1",
       [id]
     );
     const existingUser = existingResult.rows[0];
-    if (!existingUser) return res.status(404).json({ error: "Usuario no encontrado" });
+    if (!existingUser) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
 
-    if (!(await branchExists(branch_id))) {
+    if (!(await branchExists(branch_id, client))) {
+      await client.query("ROLLBACK");
       return res.status(400).json({ error: "La sucursal seleccionada no existe" });
     }
 
     const normalizedPlanId = plan_id || null;
     const planChanged = Number(existingUser.plan_id || 0) !== Number(normalizedPlanId || 0);
     let expirationDate = existingUser.plan_expiration_date;
+    let assignedPlan = null;
 
     if (!normalizedPlanId) {
       expirationDate = null;
     } else if (planChanged || !expirationDate) {
-      const plan = await getActivePlan(normalizedPlanId);
+      const plan = await getActivePlan(client, normalizedPlanId);
       if (!plan) {
+        await client.query("ROLLBACK");
         return res.status(400).json({ error: "El plan seleccionado no existe o esta inactivo" });
       }
-      expirationDate = calculateExpirationDate(plan.duration_value, plan.duration_unit);
+      assignedPlan = plan;
+      expirationDate = null;
     }
 
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE users
           SET branch_id = $1,
               plan_id = $2,
@@ -180,9 +181,21 @@ const updateUser = async (req, res) => {
        expirationDate, id]
     );
 
-    return res.json(result.rows[0]);
+    const membership = assignedPlan
+      ? await assignMembership(client, { userId: id, plan: assignedPlan })
+      : null;
+    await client.query("COMMIT");
+
+    const user = membership?.user || result.rows[0];
+    if (membership) {
+      await notifyMembershipConfirmation({ user, plan: assignedPlan, startDate: membership.startDate });
+    }
+    return res.json(user);
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
     return databaseErrorResponse(error, res, "actualizar");
+  } finally {
+    client.release();
   }
 };
 

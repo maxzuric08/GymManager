@@ -1,17 +1,7 @@
 ﻿const pool = require("../db");
 const mercadoPago = require("../services/mercadoPago.service");
 
-const calculateExpirationDate = (plan, fromDate = new Date()) => {
-  const expiration = new Date(fromDate);
-  const value = Number.parseInt(plan.duration_value, 10) || 1;
-  const unit = String(plan.duration_unit || "months").toLowerCase();
-
-  if (unit === "days") expiration.setUTCDate(expiration.getUTCDate() + value);
-  else if (unit === "weeks") expiration.setUTCDate(expiration.getUTCDate() + value * 7);
-  else expiration.setUTCMonth(expiration.getUTCMonth() + value);
-
-  return expiration.toISOString().slice(0, 10);
-};
+const { assignMembership, notifyMembershipConfirmation } = require("../services/membership.service");
 
 const getMyPayments = async (req, res) => {
   try {
@@ -183,17 +173,21 @@ const createCheckout = async (req, res) => {
   }
 };
 
-const processPayment = async (paymentId) => {
-  const payment = await mercadoPago.getPayment(String(paymentId));
+const processPayment = async (paymentId, dependencies = {}) => {
+  const db = dependencies.pool || pool;
+  const paymentService = dependencies.mercadoPago || mercadoPago;
+  const sendConfirmation = dependencies.sendMembershipConfirmation || notifyMembershipConfirmation;
+  const payment = await paymentService.getPayment(String(paymentId));
   if (!payment.external_reference?.startsWith("gym-payment-")) return;
 
-  const client = await pool.connect();
+  const client = await db.connect();
   try {
     await client.query("BEGIN");
     const localResult = await client.query(
       `SELECT pay.*, p.duration_value, p.duration_unit, p.cost,
               u.plan_id AS current_plan_id,
-              u.plan_expiration_date AS current_plan_expiration_date
+              u.plan_expiration_date AS current_plan_expiration_date,
+              u.username, u.first_name, u.last_name, u.email
          FROM payments pay
          JOIN plans p ON p.plan_id = pay.plan_id
          JOIN users u ON u.user_id = pay.user_id
@@ -240,19 +234,26 @@ const processPayment = async (paymentId) => {
         if (currentExpiration > approvedDate) membershipStart = currentExpiration;
       }
 
-      const expirationDate = calculateExpirationDate(localPayment, membershipStart);
-
-      await client.query(
-        "UPDATE users SET plan_id = $1, plan_expiration_date = $2 WHERE user_id = $3",
-        [localPayment.plan_id, expirationDate, localPayment.user_id]
-      );
+      const membership = await assignMembership(client, {
+        userId: localPayment.user_id,
+        plan: localPayment,
+        startDate: membershipStart,
+      });
       await client.query(
         "UPDATE payments SET expiry_date = $1, processed_at = CURRENT_TIMESTAMP WHERE payment_id = $2",
-        [expirationDate, localPayment.payment_id]
+        [membership.expirationDate, localPayment.payment_id]
       );
+      localPayment.membership = membership;
     }
 
     await client.query("COMMIT");
+    if (localPayment.membership) {
+      await sendConfirmation({
+        user: localPayment.membership.user,
+        plan: localPayment,
+        startDate: localPayment.membership.startDate,
+      });
+    }
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -390,4 +391,4 @@ const getAllPayments = async (req, res) => {
   }
 };
 
-module.exports = { createCheckout, getMyPayments, paymentReturn, webhook, getAllPayments };
+module.exports = { createCheckout, getMyPayments, paymentReturn, webhook, getAllPayments, processPayment };
