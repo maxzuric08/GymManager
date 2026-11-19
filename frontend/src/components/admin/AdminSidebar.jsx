@@ -12,6 +12,7 @@ export default function AdminSidebar({
     { key: "medical-certificates", label: "Aptos Medicos", icon: "📄" },
     { key: "attendance", label: "Asistencias", icon: "✓" },
     { key: "payments", label: "Pagos", icon: "$" },
+    { key: "notifications", label: "Notificaciones", icon: "🔔" },
   ];
 
   return (

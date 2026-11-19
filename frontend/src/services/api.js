@@ -606,6 +606,18 @@ export async function getAllPaymentsAdminRequest({ userId, status, dateFrom, dat
   return data;
 }
 
+export async function getMembershipExpirationNotificationRunsRequest(limit = 20) {
+  const response = await apiFetch(
+    `${API_URL}/notifications/expiration-reminders/runs?limit=${limit}`,
+    { headers: getAuthHeaders() }
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener el historial de notificaciones");
+  }
+  return data;
+}
+
 export async function getInstructorAttendanceHistoryRequest(dateFrom, dateTo) {
   const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
   const response = await apiFetch(`${API_URL}/attendance/instructor/history?${params}`, {
