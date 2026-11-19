@@ -69,6 +69,43 @@ const initializeDatabase = async () => {
     `);
     console.log("Payment checkout URL added");
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS membership_notification_runs (
+        notification_run_id SERIAL PRIMARY KEY,
+        notification_type VARCHAR(50) NOT NULL,
+        target_expiration_date DATE NOT NULL,
+        trigger VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+        status VARCHAR(20) NOT NULL DEFAULT 'running',
+        processed_count INTEGER NOT NULL DEFAULT 0,
+        sent_count INTEGER NOT NULL DEFAULT 0,
+        failed_count INTEGER NOT NULL DEFAULT 0,
+        skipped_count INTEGER NOT NULL DEFAULT 0,
+        error_message TEXT,
+        started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMPTZ,
+        CHECK (trigger IN ('scheduled', 'manual')),
+        CHECK (status IN ('running', 'completed', 'failed'))
+      );
+
+      CREATE TABLE IF NOT EXISTS membership_notification_deliveries (
+        membership_notification_delivery_id SERIAL PRIMARY KEY,
+        notification_run_id INTEGER REFERENCES membership_notification_runs(notification_run_id) ON DELETE SET NULL,
+        user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+        notification_type VARCHAR(50) NOT NULL,
+        expiration_date DATE NOT NULL,
+        delivery_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        error_message TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completed_at TIMESTAMPTZ,
+        CHECK (delivery_status IN ('pending', 'sent', 'failed')),
+        UNIQUE (user_id, notification_type, expiration_date)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_membership_notification_runs_started_at
+      ON membership_notification_runs(started_at DESC);
+    `);
+    console.log("✓ membership notification audit tables created");
+
     // Create index for better query performance
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_medical_certificates_user_id

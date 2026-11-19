@@ -1,63 +1,32 @@
 require("dotenv").config();
+
 const pool = require("./db");
-const { sendMembershipExpirationNotifications } = require("./controllers/notifications.controllers");
+const { runMembershipExpirationNotifications } = require("./controllers/notifications.controllers");
 
-const testMembershipExpiration = async () => {
+const simulateMembershipExpirationCheck = async () => {
   try {
-    console.log("🧪 Iniciando prueba de notificaciones de membresía...\n");
+    console.log("🧪 Simulando chequeo de vencimientos de membresía...\n");
 
-    // 1. Crear un plan de prueba que vence mañana
-    console.log("1️⃣ Creando plan de prueba (vence mañana)...");
-    const planResult = await pool.query(
-      `INSERT INTO plans (plan_type, cost, duration, benefits, class_limit, status, duration_value, duration_unit)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      ["Plan Prueba", "9999", "1 día", "Plan de prueba", 10, "active", 1, "days"]
-    );
-    const testPlanId = planResult.rows[0].plan_id;
-    console.log(`✅ Plan creado: ID ${testPlanId}\n`);
+    const result = await runMembershipExpirationNotifications({
+      db: pool,
+      dryRun: true,
+      trigger: "manual",
+    });
 
-    // 2. Crear un usuario de prueba con email
-    console.log("2️⃣ Creando usuario de prueba...");
-    const randomDni = Math.floor(Math.random() * 99999999).toString();
-    const userResult = await pool.query(
-      `INSERT INTO users (username, password, first_name, last_name, email, dni, plan_id, plan_expiration_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING *`,
-      [
-        `usuarioPrueba${Date.now()}`,
-        "password123",
-        "Usuario",
-        "Prueba",
-        "maxzuric.08@gmail.com",  // 👈 CAMBIAR A TU EMAIL
-        randomDni,
-        testPlanId,
-        new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0] // Mañana
-      ]
-    );
-    const testUserId = userResult.rows[0].user_id;
-    console.log(`✅ Usuario creado: ID ${testUserId}, Email: maxzuric.08@gmail.comn`);
+    console.log(`Fecha objetivo: ${result.expirationDate}`);
+    console.log(`Socios elegibles: ${result.candidates.length}`);
 
-    // 3. Enviar notificaciones
-    console.log("3️⃣ Enviando notificaciones...");
-    const result = await sendMembershipExpirationNotifications();
-    console.log(`✅ ${result.sent} emails enviados\n`);
+    for (const user of result.candidates) {
+      console.log(`- Usuario ${user.user_id}: ${user.email} (${user.plan_type})`);
+    }
 
-    // 4. Mostrar datos
-    console.log("📋 Datos de prueba creados:");
-    console.log(`   - Plan ID: ${testPlanId}`);
-    console.log(`   - Usuario ID: ${testUserId}`);
-    console.log(`   - Vencimiento: Mañana (${new Date(new Date().setDate(new Date().getDate() + 1)).toLocaleDateString('es-AR')})`);
-    console.log(`   - Email: maxzuric.08@gmail.com\n`);
-
-    console.log("✅ Prueba completada!\n");
-    console.log("Nota: Revisa tu email en maxzuric.08@gmail.com para ver la notificación");
-
-    process.exit(0);
+    console.log("\n✅ Simulación completada: no se crearon usuarios, planes, envíos ni registros.");
   } catch (error) {
-    console.error("❌ Error en la prueba:", error);
-    process.exit(1);
+    console.error("❌ Error en la simulación:", error);
+    process.exitCode = 1;
+  } finally {
+    await pool.end();
   }
 };
 
-testMembershipExpiration();
+simulateMembershipExpirationCheck();
