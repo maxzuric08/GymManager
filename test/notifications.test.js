@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   getTomorrowArgentinaDate,
   getMembershipExpirationNotificationRuns,
+  listMembershipExpirationNotificationRuns,
   runMembershipExpirationNotifications,
 } = require("../src/controllers/notifications.controllers");
 const initializeScheduledTasks = require("../src/scheduledTasks");
@@ -126,8 +127,24 @@ test("el endpoint administrativo devuelve las ejecuciones almacenadas", async ()
   const db = createQueuedDb([{ rows: [{ notification_run_id: 4, failures: [] }] }]);
   const response = { body: null, json(value) { this.body = value; return value; }, status() { return this; } };
 
-  await getMembershipExpirationNotificationRuns({ query: {} }, response, db);
+  await listMembershipExpirationNotificationRuns({ query: {} }, response, db);
 
   assert.deepEqual(response.body, { runs: [{ notification_run_id: 4, failures: [] }] });
   assert.equal(db.calls[0].params[1], 20);
+});
+
+test("el handler de la ruta usa la conexión aunque Express le pase next como tercer argumento", async () => {
+  const pool = require("../src/db");
+  const originalQuery = pool.query;
+  const db = createQueuedDb([{ rows: [{ notification_run_id: 9, failures: [] }] }]);
+  pool.query = db.query;
+  const response = { body: null, json(value) { this.body = value; return value; }, status() { return this; } };
+
+  try {
+    await getMembershipExpirationNotificationRuns({ query: {} }, response, () => {});
+  } finally {
+    pool.query = originalQuery;
+  }
+
+  assert.deepEqual(response.body, { runs: [{ notification_run_id: 9, failures: [] }] });
 });

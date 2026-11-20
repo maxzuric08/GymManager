@@ -133,7 +133,7 @@ const sendMembershipExpirationNotifications = async (req, res) => {
   return result;
 };
 
-const getMembershipExpirationNotificationRuns = async (req, res, db = pool) => {
+const listMembershipExpirationNotificationRuns = async (req, res, db) => {
   const requestedLimit = Number.parseInt(req.query.limit, 10);
   const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 && requestedLimit <= 100 ? requestedLimit : 20;
 
@@ -163,6 +163,11 @@ const getMembershipExpirationNotificationRuns = async (req, res, db = pool) => {
   }
 };
 
+// Express invoca los handlers con (req, res, next): no debe aceptar un tercer
+// parámetro opcional, porque recibiría `next` en lugar de la conexión.
+const getMembershipExpirationNotificationRuns = (req, res) =>
+  listMembershipExpirationNotificationRuns(req, res, pool);
+
 module.exports = {
   MEMBERSHIP_EXPIRATION_NOTIFICATION,
   getTomorrowArgentinaDate,
@@ -170,4 +175,5 @@ module.exports = {
   runMembershipExpirationNotifications,
   sendMembershipExpirationNotifications,
   getMembershipExpirationNotificationRuns,
+  listMembershipExpirationNotificationRuns,
 };
