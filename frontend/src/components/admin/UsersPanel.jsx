@@ -7,7 +7,6 @@ import {
   updateUserRequest,
   deleteUserRequest,
   reactivateUserRequest,
-  removeMembershipRequest,
 } from "../../services/api";
 
 export default function UsersPanel() {
@@ -155,38 +154,6 @@ export default function UsersPanel() {
 
     const plan = plans.find((item) => Number(item.plan_id) === Number(user.plan_id));
     return plan?.plan_type || "Sin plan";
-  };
-
-  const handleRemoveMembership = (userId) => {
-    setModal({
-      isOpen: true,
-      title: "Remover membresía",
-      message: "¿Estás seguro de que quieres remover la membresía de este usuario?",
-      type: "warning",
-      onConfirm: async () => {
-        try {
-          await removeMembershipRequest(userId);
-          setModal({
-            isOpen: true,
-            title: "Éxito",
-            message: "Membresía removida correctamente",
-            type: "success",
-            onConfirm: () => {
-              setModal({ ...modal, isOpen: false });
-              fetchUsers();
-            }
-          });
-        } catch (err) {
-          setModal({
-            isOpen: true,
-            title: "Error",
-            message: err.message,
-            type: "error",
-            onConfirm: () => setModal({ ...modal, isOpen: false })
-          });
-        }
-      }
-    });
   };
 
   return (
