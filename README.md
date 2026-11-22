@@ -13,6 +13,10 @@ Este proyecto **no está pensado para** creación de rutinas, o gestión persona
 
 ## Entorno local con Docker
 
+Al crear la base de datos por primera vez, Docker carga el esquema y los datos
+de prueba de `database/seed.sql`. La cuenta administrativa inicial es
+`admin1` con contraseña `123456`; es solo para desarrollo local.
+
 El backend y PostgreSQL se pueden ejecutar sin instalar PostgreSQL localmente. El frontend no forma parte de estos contenedores.
 
 ### Configuración inicial
