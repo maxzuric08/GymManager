@@ -3,3 +3,7 @@
 .idea
 frontend/.idea
 frontend/node_modules
+# macOS / R
+.DS_Store
+**/.DS_Store
+.Rhistory
