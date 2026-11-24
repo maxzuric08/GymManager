@@ -1,17 +1,37 @@
 import { useState, useEffect } from "react";
 import Modal from "../Modal";
+import FormField from "../FormField";
+import { mapErrorToField } from "../../utils/fieldErrors";
 import {
   getUsersRequest,
   getPlansRequest,
+  getBranchesRequest,
   createUserRequest,
   updateUserRequest,
   deleteUserRequest,
   reactivateUserRequest,
 } from "../../services/api";
 
+// Cada regla asocia un fragmento del mensaje del backend con el campo afectado.
+const ERROR_FIELD_RULES = [
+  [/usuario o dni ya/i, "dni"],
+  [/nombre de usuario/i, "username"],
+  [/contrasena/i, "password"],
+  [/dni/i, "dni"],
+  [/nombre solo/i, "first_name"],
+  [/apellido solo/i, "last_name"],
+  [/telefono/i, "phone"],
+  [/email/i, "email"],
+  [/nacimiento/i, "birth_date"],
+  [/sucursal/i, "branch_id"],
+  [/plan/i, "plan_id"],
+];
+
 export default function UsersPanel() {
   const [users, setUsers] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -41,17 +61,39 @@ export default function UsersPanel() {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      setBranches(await getBranchesRequest());
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchPlans();
+    fetchBranches();
   }, []);
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // Actualiza un campo y limpia el error que tenía asociado.
+  const setField = (name, value) => {
+    setFormData((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => (current[name] ? { ...current, [name]: undefined } : current));
   };
+
+  const handleInputChange = (e) => setField(e.target.name, e.target.value);
+  const handleLettersChange = (e) => setField(e.target.name, e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ""));
+  const handleDigitsChange = (e) => setField(e.target.name, e.target.value.replace(/\D/g, ""));
+  const handlePhoneChange = (e) => setField(e.target.name, e.target.value.replace(/[^\d\s-]/g, ""));
+
+  // Los planes inactivos no se pueden asignar, salvo el que el usuario ya tiene.
+  const selectablePlans = plans.filter(
+    (plan) => plan.status === "active" || Number(plan.plan_id) === Number(formData.plan_id)
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFieldErrors({});
 
     const payload = {
       ...formData,
@@ -76,6 +118,11 @@ export default function UsersPanel() {
         email: "", phone: "", birth_date: "", branch_id: "", plan_id: "",
       });
     } catch (err) {
+      const field = mapErrorToField(err.message, ERROR_FIELD_RULES);
+      if (field) {
+        setFieldErrors({ [field]: err.message });
+        return;
+      }
       setModal({
         isOpen: true,
         title: "Error",
@@ -190,23 +237,55 @@ export default function UsersPanel() {
         <form onSubmit={handleSubmit} style={styles.formCard}>
           <h3>{editingUser ? "Editar Usuario" : "Crear Nuevo Usuario"}</h3>
 
+          <p style={styles.legend}>Los campos con <span aria-hidden="true" style={{ color: "#b91c1c" }}>*</span> son obligatorios.</p>
+
           <div style={styles.grid}>
-            <input name="username" placeholder="Usuario" value={formData.username} onChange={handleInputChange} style={styles.input} required />
-            <input name="password" type="password" placeholder={editingUser ? "Nueva contraseña (opcional)" : "Contraseña"} value={formData.password} onChange={handleInputChange} style={styles.input} required={!editingUser} />
-            <input name="first_name" placeholder="Nombre" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
-            <input name="last_name" placeholder="Apellido" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
-            <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
-            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar obligatoriamente en .com" />
-            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s-]/g, "") })} style={styles.input} />
-
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 10px", borderRadius: "4px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-              <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Nacimiento</span>
-              <input name="birth_date" type="date" max={new Date().toISOString().split("T")[0]} value={formData.birth_date || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "10px 0", backgroundColor: "transparent", color: "#1e293b" }} />
-            </div>
-
-            <input name="branch_id" type="number" placeholder="ID Sucursal" value={formData.branch_id || ""} onChange={handleInputChange} style={styles.input} />
-            <input name="plan_id" type="number" placeholder="ID Plan" value={formData.plan_id || ""} onChange={handleInputChange} style={styles.input} />
-
+            <FormField id="user-username" label="Usuario" required help="Nombre con el que inicia sesión. No puede repetirse." error={fieldErrors.username}>
+              <input name="username" value={formData.username} onChange={handleInputChange} style={styles.input} required autoComplete="off" />
+            </FormField>
+            <FormField
+              id="user-password"
+              label="Contraseña"
+              required={!editingUser}
+              help={editingUser ? "Dejala vacía para conservar la contraseña actual." : "Obligatoria al crear el usuario."}
+              error={fieldErrors.password}
+            >
+              <input name="password" type="password" value={formData.password} onChange={handleInputChange} style={styles.input} required={!editingUser} autoComplete="new-password" />
+            </FormField>
+            <FormField id="user-first-name" label="Nombre" help="Solo letras y espacios." error={fieldErrors.first_name}>
+              <input name="first_name" value={formData.first_name} onChange={handleLettersChange} style={styles.input} />
+            </FormField>
+            <FormField id="user-last-name" label="Apellido" help="Solo letras y espacios." error={fieldErrors.last_name}>
+              <input name="last_name" value={formData.last_name} onChange={handleLettersChange} style={styles.input} />
+            </FormField>
+            <FormField id="user-dni" label="DNI" required help="Solo números, hasta 10 dígitos. No puede repetirse." error={fieldErrors.dni}>
+              <input name="dni" type="text" inputMode="numeric" value={formData.dni} onChange={handleDigitsChange} style={styles.input} required maxLength="10" />
+            </FormField>
+            <FormField id="user-email" label="Email" required help="Recibe los avisos de reservas y vencimiento de la membresía." error={fieldErrors.email}>
+              <input name="email" type="email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar obligatoriamente en .com" />
+            </FormField>
+            <FormField id="user-phone" label="Teléfono" help="Opcional. Solo números, espacios y guiones." error={fieldErrors.phone}>
+              <input name="phone" type="tel" value={formData.phone} onChange={handlePhoneChange} style={styles.input} />
+            </FormField>
+            <FormField id="user-birth-date" label="Fecha de nacimiento" help="Opcional. No puede ser una fecha futura." error={fieldErrors.birth_date}>
+              <input name="birth_date" type="date" max={new Date().toISOString().split("T")[0]} value={formData.birth_date || ""} onChange={handleInputChange} style={styles.input} />
+            </FormField>
+            <FormField id="user-branch" label="Sucursal" help="Opcional. Sucursal donde entrena el socio." error={fieldErrors.branch_id}>
+              <select name="branch_id" value={formData.branch_id ?? ""} onChange={handleInputChange} style={styles.input}>
+                <option value="">Sin sucursal</option>
+                {branches.map((branch) => (
+                  <option key={branch.branch_id} value={branch.branch_id}>{branch.location}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField id="user-plan" label="Plan" help="Opcional. Solo se pueden elegir planes activos." error={fieldErrors.plan_id}>
+              <select name="plan_id" value={formData.plan_id ?? ""} onChange={handleInputChange} style={styles.input}>
+                <option value="">Sin plan</option>
+                {selectablePlans.map((plan) => (
+                  <option key={plan.plan_id} value={plan.plan_id}>{plan.plan_type}</option>
+                ))}
+              </select>
+            </FormField>
           </div>
 
           <div style={{ marginTop: "1.5rem" }}>
@@ -286,7 +365,8 @@ const styles = {
   td: { padding: "12px", borderBottom: "1px solid #ddd" },
   primaryBtn: { padding: "8px 16px", backgroundColor: "#198754", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontWeight: "bold" },
   formCard: { backgroundColor: "#f8f9fa", padding: "1.5rem", borderRadius: "8px", border: "1px solid #ddd", marginBottom: "1rem" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" },
+  legend: { margin: "0 0 12px", fontSize: "0.82rem", color: "#64748b" },
   input: { padding: "10px", borderRadius: "4px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
   editBtn: { background: "#2563eb", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   reactivateBtn: { background: "#22c55e", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
