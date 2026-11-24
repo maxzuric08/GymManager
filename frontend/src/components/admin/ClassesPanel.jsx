@@ -138,9 +138,12 @@ export default function ClassesPanel() {
   const confirmDeleteClass = async () => {
     if (!classToDelete) return;
     try {
-      await deleteClassRequest(classToDelete.class_id);
+      const data = await deleteClassRequest(classToDelete.class_id);
       setClassToDelete(null);
       fetchClasses();
+      if (data.cancelled_bookings > 0) {
+        setFeedbackModal({ isOpen: true, title: "Clase desactivada", message: data.message, type: "success" });
+      }
     } catch (err) {
       showError(err.message);
     }
@@ -148,8 +151,9 @@ export default function ClassesPanel() {
 
   const handleReactivateClass = async (classId) => {
     try {
-      await reactivateClassRequest(classId);
+      const data = await reactivateClassRequest(classId);
       fetchClasses();
+      setFeedbackModal({ isOpen: true, title: "Clase reactivada", message: data.message, type: "info" });
     } catch (err) {
       showError(err.message);
     }
@@ -456,6 +460,9 @@ const handleSubmit = async (e) => {
                         <h3 style={styles.modalTitle}>Eliminar clase</h3>
                         <p style={styles.modalText}>
                           ¿Seguro que quieres eliminar la clase de <strong>{classToDelete.class_name}</strong> del instructor <strong>{getInstructorName(classToDelete.instructor_id)}</strong>?
+                        </p>
+                        <p style={styles.modalText}>
+                          Si la clase todavía no empezó, se cancelarán las reservas de los socios anotados y se les avisará por mail.
                         </p>
 
                         <div style={styles.modalActions}>
