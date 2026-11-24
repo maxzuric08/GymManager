@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Modal from "../Modal";
+import FormField from "../FormField";
 import { getPlansRequest, createPlanRequest, updatePlanRequest, deactivatePlanRequest, reactivatePlanRequest } from "../../services/api";
 
 export default function PlansPanel() {
@@ -182,58 +183,31 @@ export default function PlansPanel() {
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
           <h3>Crear Nuevo Plan</h3>
+          <p style={styles.legend}>Los campos con <span aria-hidden="true" style={{ color: "#b91c1c" }}>*</span> son obligatorios.</p>
+
           <div style={styles.grid}>
-            <input
-              name="plan_type"
-              placeholder="Tipo de plan"
-              value={formData.plan_type}
-              onChange={handleInputChange}
-              required
-              style={styles.input}
-            />
-            <input
-              name="cost"
-              type="number"
-              placeholder="Costo"
-              value={formData.cost}
-              onChange={handleInputChange}
-              required
-              style={styles.input}
-            />
-            <input
-              name="duration_value"
-              type="number"
-              placeholder="Duración"
-              value={formData.duration_value}
-              onChange={handleInputChange}
-              min="1"
-              style={styles.input}
-            />
-            <select
-              name="duration_unit"
-              value={formData.duration_unit}
-              onChange={handleInputChange}
-              style={styles.input}
-            >
-              <option value="days">Días</option>
-              <option value="months">Meses</option>
-              <option value="weeks">Semanas</option>
-            </select>
-            <input
-              name="class_limit"
-              type="number"
-              placeholder="Límite de clases"
-              value={formData.class_limit}
-              onChange={handleInputChange}
-              style={styles.input}
-            />
-            <input
-              name="benefits"
-              placeholder="Beneficios"
-              value={formData.benefits}
-              onChange={handleInputChange}
-              style={styles.input}
-            />
+            <FormField id="plan-type" label="Nombre del plan" required help="Cómo se muestra el plan a los socios. Por ejemplo: Premium.">
+              <input name="plan_type" value={formData.plan_type} onChange={handleInputChange} required style={styles.input} />
+            </FormField>
+            <FormField id="plan-cost" label="Costo (ARS)" required help="Precio total del plan en pesos.">
+              <input name="cost" type="number" min="0" value={formData.cost} onChange={handleInputChange} required style={styles.input} />
+            </FormField>
+            <FormField id="plan-duration-value" label="Duración" help="Cantidad de días, semanas o meses que dura el plan.">
+              <input name="duration_value" type="number" value={formData.duration_value} onChange={handleInputChange} min="1" style={styles.input} />
+            </FormField>
+            <FormField id="plan-duration-unit" label="Unidad de duración" help="Unidad en la que se mide la duración.">
+              <select name="duration_unit" value={formData.duration_unit} onChange={handleInputChange} style={styles.input}>
+                <option value="days">Días</option>
+                <option value="months">Meses</option>
+                <option value="weeks">Semanas</option>
+              </select>
+            </FormField>
+            <FormField id="plan-class-limit" label="Límite de reservas" help="Máximo de reservas futuras activas a la vez. Vacío significa sin límite.">
+              <input name="class_limit" type="number" value={formData.class_limit} onChange={handleInputChange} style={styles.input} />
+            </FormField>
+            <FormField id="plan-benefits" label="Beneficios" help="Texto que se muestra al socio y se incluye en el mail de confirmación.">
+              <input name="benefits" value={formData.benefits} onChange={handleInputChange} style={styles.input} />
+            </FormField>
           </div>
 
           <button type="submit" style={{ ...styles.primaryBtn, marginTop: "1rem" }}>
@@ -343,9 +317,10 @@ const styles = {
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "10px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "14px",
   },
+  legend: { margin: "0 0 12px", fontSize: "0.82rem", color: "#64748b" },
   input: {
     padding: "8px",
     borderRadius: "4px",
