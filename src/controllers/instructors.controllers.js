@@ -135,12 +135,17 @@ const updateInstructor = async (req, res) => {
   }
 };
 
-async function findNextFutureClass(instructorId) {
-  const result = await pool.query(
+// Una clase bloquea la baja solo si todavía no terminó (hora Argentina):
+// las clases de días anteriores o de hoy ya finalizadas son historial.
+async function findNextFutureClass(instructorId, db = pool) {
+  const result = await db.query(
     `SELECT class_name, class_date, start_time
        FROM classes
       WHERE instructor_id = $1
-        AND class_date >= ${ARGENTINA_SQL_DATE}
+        AND (
+          class_date > ${ARGENTINA_SQL_DATE} OR
+          (class_date = ${ARGENTINA_SQL_DATE} AND end_time > ${ARGENTINA_SQL_TIME})
+        )
         AND status NOT IN ('cancelled', 'inactive')
       ORDER BY class_date, start_time
       LIMIT 1`,
@@ -149,11 +154,12 @@ async function findNextFutureClass(instructorId) {
   return result.rows[0] || null;
 }
 
-async function ensureInstructorCanBeDeactivated(instructorId) {
-  const futureClass = await findNextFutureClass(instructorId);
+async function ensureInstructorCanBeDeactivated(instructorId, db = pool) {
+  const futureClass = await findNextFutureClass(instructorId, db);
   if (!futureClass) return null;
-  return `No se puede desactivar: tiene la clase ${futureClass.class_name} el ${new Date(futureClass.class_date).toLocaleDateString("es-AR")} a las ${futureClass.start_time.slice(0, 5)}`;
+  return `No se puede desactivar: tiene la clase ${futureClass.class_name} el ${new Date(futureClass.class_date).toLocaleDateString("es-AR")} a las ${futureClass.start_time.slice(0, 5)}. Reasignala o cancelala antes de desactivar al instructor.`;
 }
+
 const deleteInstructor = async (req, res) => {
   try {
     const conflict = await ensureInstructorCanBeDeactivated(req.params.id);
@@ -267,6 +273,8 @@ const updateMyAvailability = async (req, res) => {
 };
 
 module.exports = {
+  findNextFutureClass,
+  ensureInstructorCanBeDeactivated,
   getInstructors,
   createInstructor,
   updateInstructor,
