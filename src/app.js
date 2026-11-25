@@ -18,5 +18,6 @@ app.use("/attendance", require("./routes/attendance.routes"));
 app.use("/medical-certificates", require("./routes/medicalCertificates.routes"));
 app.use("/notifications", require("./routes/notifications.routes"));
 app.use("/payments", require("./routes/payments.routes"));
+app.use("/recommendations", require("./routes/recommendations.routes"));
 
 module.exports = app;
