@@ -13,9 +13,13 @@ Este proyecto **no está pensado para** creación de rutinas, o gestión persona
 
 ## Entorno local con Docker
 
-Al crear la base de datos por primera vez, Docker carga el esquema y los datos
-de prueba de `database/seed.sql`. La cuenta administrativa inicial es
-`admin1` con contraseña `123456`; es solo para desarrollo local.
+Al usar `docker compose` en desarrollo, Docker carga el esquema y los datos
+de demostración de `database/seed.sql` mediante `compose.override.yaml`. La
+cuenta administrativa inicial es `admin1` con contraseña `123456` y el socio
+demo es `juan123` con contraseña `123456`; estas cuentas son solo locales.
+
+`compose.yaml` no carga datos demo. Para un despliegue productivo usá solo ese
+archivo: `docker compose -f compose.yaml up -d`.
 
 El backend y PostgreSQL se pueden ejecutar sin instalar PostgreSQL localmente. El frontend no forma parte de estos contenedores.
 
@@ -45,7 +49,11 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-En la primera creación del volumen, PostgreSQL ejecuta `database/gymmanager.sql` y deja el esquema listo. No se cargan datos de ejemplo.
+En la primera creación del volumen, PostgreSQL ejecuta `database/gymmanager.sql`
+y, en desarrollo, `database/seed.sql`. El seed incluye tres clases futuras
+disponibles, una clase llena, un instructor inactivo y una clase histórica. Las
+fechas se calculan con la hora de Argentina, por lo que las clases disponibles
+siempre comienzan a partir del día siguiente.
 
 ### Detener y reiniciar
 
@@ -67,6 +75,22 @@ Los datos se conservan en el volumen nombrado `gymmanager-postgres-data`. Para c
 docker compose down -v
 docker compose up --build -d
 ```
+
+### Reaplicar los datos demo
+
+El seed se puede ejecutar más de una vez sin duplicar sus instructores, clases
+ni reservas. Para restablecer o actualizar los datos demo sobre un volumen ya
+existente, ejecutá:
+
+```powershell
+docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/02-demo-seed.sql'
+```
+
+Las clases futuras se agregan según la fecha de cada ejecución; las que ya
+coinciden en instructor, horario y fecha se conservan sin duplicarse.
+
+Para la demo del 01/12/2026, reinicializá o reaplicá el seed ese día: Yoga,
+Funcional y Pilates quedarán programadas del 02/12 al 04/12.
 
 ### Inicializaciones incrementales
 
