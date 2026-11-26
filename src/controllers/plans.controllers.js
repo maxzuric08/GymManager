@@ -4,6 +4,22 @@ const {
   getActivePlan,
   notifyMembershipConfirmation,
 } = require("../services/membership.service");
+const { validatePlanInput } = require("../services/planRules");
+
+const DUPLICATE_NAME_ERROR = "Ya existe un plan activo con ese nombre";
+
+// Dos planes activos no pueden compartir nombre (sin distinguir mayúsculas).
+async function findActivePlanNameConflict(planType, excludePlanId = null, db = pool) {
+    const result = await db.query(
+        `SELECT plan_id FROM plans
+          WHERE status = 'active'
+            AND LOWER(BTRIM(plan_type)) = LOWER(BTRIM($1))
+            AND ($2::integer IS NULL OR plan_id <> $2)
+          LIMIT 1`,
+        [planType, excludePlanId]
+    );
+    return result.rows[0] || null;
+}
 
 const getPlans =  async (req, res) => {
     try {
@@ -17,21 +33,26 @@ const getPlans =  async (req, res) => {
 
 const createPlan =  async (req, res) => {
     try {
-        const { plan_type, cost, duration, benefits, class_limit, status, duration_value, duration_unit } = req.body;
+        const { error, field, values } = validatePlanInput(req.body);
+        if (error) return res.status(400).json({ error, field });
+
+        if (values.status === "active" && await findActivePlanNameConflict(values.plan_type)) {
+            return res.status(409).json({ error: DUPLICATE_NAME_ERROR, field: "plan_type" });
+        }
 
         const result = await pool.query(
             `INSERT INTO plans (plan_type, cost, duration, benefits, class_limit, status, duration_value, duration_unit)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
              RETURNING *`,
             [
-                plan_type,
-                cost,
-                duration,
-                benefits,
-                class_limit,
-                status || "active",
-                duration_value || 1,
-                duration_unit || "months"
+                values.plan_type,
+                values.cost,
+                values.duration,
+                values.benefits,
+                values.class_limit,
+                values.status,
+                values.duration_value,
+                values.duration_unit
             ]
         );
 
@@ -45,7 +66,17 @@ const createPlan =  async (req, res) => {
 const updatePlan =  async (req, res) => {
     try {
         const { id } = req.params;
-        const { plan_type, cost, duration, benefits, class_limit, duration_value, duration_unit } = req.body;
+        const { error, field, values } = validatePlanInput(req.body, { partialStatus: true });
+        if (error) return res.status(400).json({ error, field });
+
+        const existing = await pool.query("SELECT plan_id, status FROM plans WHERE plan_id = $1", [id]);
+        if (existing.rows.length === 0) {
+            return res.status(404).json({ error: "Plan no encontrado" });
+        }
+
+        if (existing.rows[0].status === "active" && await findActivePlanNameConflict(values.plan_type, Number(id))) {
+            return res.status(409).json({ error: DUPLICATE_NAME_ERROR, field: "plan_type" });
+        }
 
         const result = await pool.query(
             `UPDATE plans
@@ -59,20 +90,16 @@ const updatePlan =  async (req, res) => {
              WHERE plan_id = $8
              RETURNING *`,
             [
-                plan_type,
-                cost,
-                duration,
-                benefits,
-                class_limit,
-                duration_value || 1,
-                duration_unit || "months",
+                values.plan_type,
+                values.cost,
+                values.duration,
+                values.benefits,
+                values.class_limit,
+                values.duration_value,
+                values.duration_unit,
                 id
             ]
         );
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Plan no encontrado" });
-        }
 
         res.json(result.rows[0]);
     } catch (error) {
@@ -195,14 +222,19 @@ const reactivatePlan = async (req, res) => {
   try {
     const { id } = req.params;
 
+    const existing = await pool.query("SELECT plan_id, plan_type FROM plans WHERE plan_id = $1", [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ error: "Plan no encontrado" });
+    }
+
+    if (await findActivePlanNameConflict(existing.rows[0].plan_type, Number(id))) {
+      return res.status(409).json({ error: `${DUPLICATE_NAME_ERROR}. Renombrá uno de los dos antes de reactivar.` });
+    }
+
     const result = await pool.query(
       "UPDATE plans SET status = 'active' WHERE plan_id = $1 RETURNING *",
       [id]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Plan no encontrado" });
-    }
 
     res.json({
       message: "Plan reactivado correctamente",

@@ -53,7 +53,8 @@ const createBooking = async (req, res) => {
                     u.plan_id,
                     u.plan_expiration_date,
                     p.status AS plan_status,
-                    p.class_limit
+                    p.class_limit,
+                    p.plan_type
              FROM users u
              LEFT JOIN plans p ON u.plan_id = p.plan_id
              WHERE u.user_id = $1
@@ -178,8 +179,11 @@ const createBooking = async (req, res) => {
 
             if (activeBookings.rows[0].total >= Number(user.class_limit)) {
                 await client.query("ROLLBACK");
+                const used = activeBookings.rows[0].total;
                 return res.status(409).json({
-                    error: `Tu plan permite hasta ${user.class_limit} reservas futuras activas`,
+                    error: `Tu plan ${user.plan_type} permite hasta ${user.class_limit} reserva${Number(user.class_limit) === 1 ? "" : "s"} futura${Number(user.class_limit) === 1 ? "" : "s"} activa${Number(user.class_limit) === 1 ? "" : "s"} y ya tenés ${used}. Cancelá una reserva para poder reservar otra.`,
+                    class_limit: Number(user.class_limit),
+                    active_bookings: used,
                 });
             }
         }
