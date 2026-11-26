@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import Modal from "../Modal";
+import FormField from "../FormField";
+import { mapErrorToField } from "../../utils/fieldErrors";
 import { getArgentinaDate, getArgentinaTimeShort, hasClassStarted } from "../../utils/argentinaTime";
 
 const getClassDisplayStatus = (cls) => {
@@ -17,12 +19,25 @@ import {
   deleteClassRequest,
   reactivateClassRequest,
   getInstructorsRequest,
+  getBranchesRequest,
   getClassStudentsRequest,
 } from "../../services/api";
+
+// Cada regla asocia un fragmento del mensaje del backend con el campo afectado.
+const ERROR_FIELD_RULES = [
+  [/instructor/i, "instructor_id"],
+  [/sucursal/i, "branch_id"],
+  [/capacidad/i, "capacity"],
+  [/fecha/i, "class_date"],
+  [/hora de t[eé]rmino|hora de fin|horario/i, "end_time"],
+  [/nombre/i, "class_name"],
+];
 
 export default function ClassesPanel() {
   const [classes, setClasses] = useState([]);
   const [instructors, setInstructors] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
@@ -91,20 +106,36 @@ export default function ClassesPanel() {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      setBranches(await getBranchesRequest());
+    } catch (err) {
+      showError(err.message);
+    }
+  };
+
   useEffect(() => {
     fetchClasses();
     fetchInstructors();
+    fetchBranches();
   }, []);
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  // Actualiza un campo y limpia el error que tenía asociado.
+  const setField = (name, value) => {
+    setFormData((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => (current[name] ? { ...current, [name]: undefined } : current));
+  };
+
+  const handleInputChange = (e) => setField(e.target.name, e.target.value);
+
+  const handleBranchChange = (e) => {
+    setField("branch_id", e.target.value);
+    setField("instructor_id", "");
   };
 
   const handleNewClass = () => {
     setEditingClass(null);
+    setFieldErrors({});
     setShowForm(true);
 
     setFormData({
@@ -121,6 +152,7 @@ export default function ClassesPanel() {
 
   const handleEdit = (cls) => {
     setEditingClass(cls.class_id);
+    setFieldErrors({});
     setShowForm(true);
 
     setFormData({
@@ -161,52 +193,55 @@ export default function ClassesPanel() {
 
 const handleSubmit = async (e) => {
   e.preventDefault();
-
-  if (!formData.instructor_id) {
-    showError("Debes seleccionar un instructor");
-    return;
-  }
-
-  if (!formData.class_name.trim()) {
-    showError("Debes ingresar un nombre para la clase");
-    return;
-  }
-
-  if (Number(formData.capacity) <= 0) {
-    showError("La capacidad debe ser mayor a 0");
-    return;
-  }
-
-  if (!formData.class_date) {
-    showError("Debes seleccionar una fecha");
-    return;
-  }
+  setFieldErrors({});
 
   const today = new Date();
   const todayStr = getArgentinaDate(today);
+  const errors = {};
 
-  if (formData.class_date < todayStr) {
-    showError("No puedes crear una clase en una fecha pasada");
-    return;
+  if (!formData.branch_id) {
+    errors.branch_id = "Debes seleccionar una sucursal";
   }
 
-  if (!formData.start_time || !formData.end_time) {
-    showError("Debes completar el horario");
-    return;
+  if (!formData.instructor_id) {
+    errors.instructor_id = "Debes seleccionar un instructor";
   }
 
-  if (formData.end_time <= formData.start_time) {
-    showError("La hora de término debe ser mayor a la hora de inicio");
-    return;
+  if (!formData.class_name.trim()) {
+    errors.class_name = "Debes ingresar un nombre para la clase";
   }
 
-  if (formData.class_date === todayStr) {
-    const currentTime = getArgentinaTimeShort(today);
+  if (Number(formData.capacity) <= 0) {
+    errors.capacity = "La capacidad debe ser mayor a 0";
+  }
 
-    if (formData.start_time <= currentTime) {
-      showError("No puedes crear una clase hoy en una hora que ya pasó");
-      return;
-    }
+  if (!formData.class_date) {
+    errors.class_date = "Debes seleccionar una fecha";
+  } else if (formData.class_date < todayStr) {
+    errors.class_date = "No puedes crear una clase en una fecha pasada";
+  }
+
+  if (!formData.start_time) {
+    errors.start_time = "Debes completar la hora de inicio";
+  }
+
+  if (!formData.end_time) {
+    errors.end_time = "Debes completar la hora de término";
+  } else if (formData.start_time && formData.end_time <= formData.start_time) {
+    errors.end_time = "La hora de término debe ser mayor a la hora de inicio";
+  }
+
+  if (
+    formData.class_date === todayStr &&
+    formData.start_time &&
+    formData.start_time <= getArgentinaTimeShort(today)
+  ) {
+    errors.start_time = "No puedes crear una clase hoy en una hora que ya pasó";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    setFieldErrors(errors);
+    return;
   }
 
   const payload = {
@@ -241,6 +276,11 @@ const handleSubmit = async (e) => {
       status: "active",
     });
   } catch (err) {
+    const field = mapErrorToField(err.message, ERROR_FIELD_RULES);
+    if (field) {
+      setFieldErrors({ [field]: err.message });
+      return;
+    }
     showError(err.message);
   }
 };
@@ -299,94 +339,114 @@ const handleSubmit = async (e) => {
         <form onSubmit={handleSubmit} style={styles.formCard}>
           <h3>{editingClass ? "Editar Clase" : "Programar Nueva Clase"}</h3>
 
+          <p style={styles.legend}>Los campos con <span aria-hidden="true" style={{ color: "#b91c1c" }}>*</span> son obligatorios.</p>
+
           <div style={styles.grid}>
-            <input
-              name="class_name"
-              placeholder="Nombre de la clase"
-              value={formData.class_name}
-              onChange={handleInputChange}
-              required
-              style={styles.input}
-            />
+            <FormField id="class-name" label="Nombre de la clase" required help="Por ejemplo: Spinning, Yoga." error={fieldErrors.class_name}>
+              <input
+                name="class_name"
+                value={formData.class_name}
+                onChange={handleInputChange}
+                required
+                style={styles.input}
+              />
+            </FormField>
 
-            <input
-              name="capacity"
-              type="number"
-              placeholder="Capacidad"
-              value={formData.capacity}
-              onChange={handleInputChange}
-              required
-              style={styles.input}
-            />
+            <FormField id="class-capacity" label="Capacidad" required help="Cantidad máxima de alumnos. Debe ser mayor a 0." error={fieldErrors.capacity}>
+              <input
+                name="capacity"
+                type="number"
+                min="1"
+                value={formData.capacity}
+                onChange={handleInputChange}
+                required
+                style={styles.input}
+              />
+            </FormField>
 
-            <input
-              name="class_date"
-              type="date"
-              value={formData.class_date}
-              onChange={handleInputChange}
-              required
-              min={getArgentinaDate()}
-              style={styles.input}
-            />
+            <FormField id="class-date" label="Fecha" required help="No puede ser una fecha pasada." error={fieldErrors.class_date}>
+              <input
+                name="class_date"
+                type="date"
+                value={formData.class_date}
+                onChange={handleInputChange}
+                required
+                min={getArgentinaDate()}
+                style={styles.input}
+              />
+            </FormField>
 
-            <input
-              name="start_time"
-              type="time"
-              value={formData.start_time}
-              onChange={handleInputChange}
-              required
-              style={styles.input}
-            />
+            <FormField id="class-start-time" label="Hora de inicio" required help="Si la clase es hoy, debe ser posterior a la hora actual." error={fieldErrors.start_time}>
+              <input
+                name="start_time"
+                type="time"
+                value={formData.start_time}
+                onChange={handleInputChange}
+                required
+                style={styles.input}
+              />
+            </FormField>
 
-            <input
-              name="end_time"
-              type="time"
-              value={formData.end_time}
-              onChange={handleInputChange}
-              required
-              style={styles.input}
-            />
+            <FormField id="class-end-time" label="Hora de término" required help="Debe ser posterior a la hora de inicio." error={fieldErrors.end_time}>
+              <input
+                name="end_time"
+                type="time"
+                value={formData.end_time}
+                onChange={handleInputChange}
+                required
+                style={styles.input}
+              />
+            </FormField>
 
-            <input
-              name="branch_id"
-              type="number"
-              placeholder="ID Sucursal"
-              value={formData.branch_id}
-              onChange={(event) => {
-                setFormData({ ...formData, branch_id: event.target.value, instructor_id: "" });
-              }}
-              style={styles.input}
-              min="1"
-              required
-            />
+            <FormField id="class-branch" label="Sucursal" required help="Al cambiarla se vuelve a elegir el instructor." error={fieldErrors.branch_id}>
+              <select
+                name="branch_id"
+                value={formData.branch_id}
+                onChange={handleBranchChange}
+                required
+                style={styles.input}
+              >
+                <option value="">Seleccionar sucursal</option>
+                {branches.map((branch) => (
+                  <option key={branch.branch_id} value={branch.branch_id}>
+                    {branch.location}
+                  </option>
+                ))}
+              </select>
+            </FormField>
 
-            <select
-              name="instructor_id"
-              value={formData.instructor_id}
-              onChange={handleInputChange}
-              style={styles.input}
-              required
-              disabled={!formData.branch_id}
-            >
-              <option value="">
-                {!formData.branch_id ? "Primero selecciona una sucursal" : "Seleccionar instructor disponible"}
-              </option>
-              {eligibleInstructors.map((instructor) => (
-                <option key={instructor.instructor_id} value={instructor.instructor_id}>
-                  {instructor.username} - {instructor.specialty || "Sin especialidad"} - {instructor.available_from.slice(0, 5)} a {instructor.available_to.slice(0, 5)}
+            <FormField id="class-instructor" label="Instructor" required help="Solo se listan instructores activos de la sucursal, con su horario de disponibilidad." error={fieldErrors.instructor_id}>
+              <select
+                name="instructor_id"
+                value={formData.instructor_id}
+                onChange={handleInputChange}
+                style={styles.input}
+                required
+                disabled={!formData.branch_id}
+              >
+                <option value="">
+                  {!formData.branch_id ? "Primero selecciona una sucursal" : "Seleccionar instructor disponible"}
                 </option>
-              ))}
-            </select>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleInputChange}
-              style={styles.input}
-            >
-              <option value="active">Activa</option>
-              <option value="cancelled">Cancelada</option>
-              <option value="inactive">Inactiva</option>
-            </select>
+                {eligibleInstructors.map((instructor) => (
+                  <option key={instructor.instructor_id} value={instructor.instructor_id}>
+                    {instructor.username} - {instructor.specialty || "Sin especialidad"} - {instructor.available_from.slice(0, 5)} a {instructor.available_to.slice(0, 5)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField id="class-status" label="Estado" help="Cancelada o inactiva ocultan la clase para nuevas reservas." error={fieldErrors.status}>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleInputChange}
+                style={styles.input}
+              >
+                <option value="active">Activa</option>
+                <option value="cancelled">Cancelada</option>
+                <option value="inactive">Inactiva</option>
+              </select>
+            </FormField>
           </div>
 
           <button
@@ -575,13 +635,16 @@ const styles = {
   },
   grid: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr",
-    gap: "10px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "14px",
   },
+  legend: { margin: "0 0 12px", fontSize: "0.82rem", color: "#64748b" },
   input: {
-    padding: "8px",
-    borderRadius: "4px",
+    padding: "10px",
+    borderRadius: "6px",
     border: "1px solid #ccc",
+    width: "100%",
+    boxSizing: "border-box",
   },
   studentsBtn: {
     background: "#0891b2",

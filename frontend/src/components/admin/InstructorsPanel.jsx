@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import Modal from "../Modal";
+import FormField from "../FormField";
+import { mapErrorToField } from "../../utils/fieldErrors";
 import {
+  getBranchesRequest,
   getInstructorsRequest,
   createInstructorRequest,
   updateInstructorRequest,
@@ -8,8 +11,25 @@ import {
   reactivateInstructorRequest,
 } from "../../services/api";
 
+// Cada regla asocia un fragmento del mensaje del backend con el campo afectado.
+const ERROR_FIELD_RULES = [
+  [/dni o usuario ya/i, "dni"],
+  [/nombre de usuario/i, "username"],
+  [/usuario y contrasena/i, "password"],
+  [/dni/i, "dni"],
+  [/nombre solo/i, "first_name"],
+  [/apellido solo/i, "last_name"],
+  [/telefono/i, "phone"],
+  [/email/i, "email"],
+  [/nacimiento/i, "birth_date"],
+  [/sucursal/i, "branch_id"],
+  [/disponible desde|disponible hasta|hora de fin|fuera de disponibilidad/i, "available_to"],
+];
+
 export default function InstructorsPanel() {
   const [instructors, setInstructors] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingInstructor, setEditingInstructor] = useState(null);
@@ -31,27 +51,38 @@ export default function InstructorsPanel() {
     }
   };
 
+  const fetchBranches = async () => {
+    try {
+      setBranches(await getBranchesRequest());
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   useEffect(() => {
     fetchInstructors();
+    fetchBranches();
   }, []);
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // Actualiza un campo y limpia el error que tenía asociado.
+  const setField = (name, value) => {
+    setFormData((current) => ({ ...current, [name]: value }));
+    setFieldErrors((current) => (current[name] ? { ...current, [name]: undefined } : current));
   };
+
+  const handleInputChange = (e) => setField(e.target.name, e.target.value);
+  const handleLettersChange = (e) => setField(e.target.name, e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, ""));
+  const handleDigitsChange = (e) => setField(e.target.name, e.target.value.replace(/\D/g, ""));
+  const handlePhoneChange = (e) => setField(e.target.name, e.target.value.replace(/[^\d\s-]/g, ""));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFieldErrors({});
 
     if (formData.available_from && formData.available_to) {
       if (formData.available_from >= formData.available_to) {
-        setModal({
-          isOpen: true,
-          title: "Error",
-          message: "La hora 'Disponible Hasta' debe ser estrictamente mayor a 'Disponible Desde'.",
-          type: "error",
-          onConfirm: () => setModal((current) => ({ ...current, isOpen: false })),
-        });
-        return; 
+        setFieldErrors({ available_to: "La hora 'Hasta' debe ser mayor a la hora 'Desde'." });
+        return;
       }
     }
 
@@ -77,6 +108,11 @@ export default function InstructorsPanel() {
         available_from: "", available_to: ""
       });
     } catch (err) {
+      const field = mapErrorToField(err.message, ERROR_FIELD_RULES);
+      if (field) {
+        setFieldErrors({ [field]: err.message });
+        return;
+      }
       setModal({
         isOpen: true,
         title: "Error",
@@ -175,32 +211,56 @@ export default function InstructorsPanel() {
         <form onSubmit={handleSubmit} style={styles.formCard}>
           <h3>{editingInstructor ? "Editar Instructor" : "Crear Nuevo Instructor"}</h3>
           
+          <p style={styles.legend}>Los campos con <span aria-hidden="true" style={{ color: "#b91c1c" }}>*</span> son obligatorios.</p>
+
           <div style={styles.grid}>
-            <input name="username" placeholder="Usuario" value={formData.username} onChange={handleInputChange} required style={styles.input} />
-            <input name="password" type="password" placeholder={editingInstructor ? "Nueva contraseña (opcional)" : "Contraseña"} value={formData.password} onChange={handleInputChange} required={!editingInstructor} style={styles.input} />
-            <input name="first_name" placeholder="Nombre (solo letras)" value={formData.first_name} onChange={(e) => setFormData({ ...formData, first_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
-            <input name="last_name" placeholder="Apellido (solo letras)" value={formData.last_name} onChange={(e) => setFormData({ ...formData, last_name: e.target.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, "") })} style={styles.input} />
-            <input name="dni" type="text" placeholder="DNI (solo números)" value={formData.dni} onChange={(e) => setFormData({ ...formData, dni: e.target.value.replace(/\D/g, "") })} style={styles.input} required maxLength="10" />
-            <input name="specialty" placeholder="Especialidad (Ej: Musculación)" value={formData.specialty} onChange={handleInputChange} style={styles.input} />
-            <input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar en .com" />
-            <input name="phone" placeholder="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/[^\d\s-]/g, "") })} style={styles.input} />
-
-           <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Nacimiento</span>
-               <input name="birth_date" type="date" max={new Date().toISOString().split("T")[0]} value={formData.birth_date || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent", color: "#1e293b" }} />
-            </div>
-
-            <input name="branch_id" type="number" min="1" required placeholder="ID Sucursal" value={formData.branch_id || ""} onChange={handleInputChange} style={styles.input} />
-
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Desde</span>
-               <input name="available_from" type="time" required value={formData.available_from || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 8px", borderRadius: "6px", border: "1px solid #ccc", backgroundColor: "#fff", boxSizing: "border-box" }}>
-               <span style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>Hasta</span>
-               <input name="available_to" type="time" required value={formData.available_to || ""} onChange={handleInputChange} style={{ border: "none", outline: "none", width: "100%", padding: "8px 0", backgroundColor: "transparent" }} />
-            </div>
+            <FormField id="instructor-username" label="Usuario" required help="Nombre con el que inicia sesión. No puede repetirse." error={fieldErrors.username}>
+              <input name="username" value={formData.username} onChange={handleInputChange} required style={styles.input} autoComplete="off" />
+            </FormField>
+            <FormField
+              id="instructor-password"
+              label="Contraseña"
+              required={!editingInstructor}
+              help={editingInstructor ? "Dejala vacía para conservar la contraseña actual." : "Obligatoria al crear el instructor."}
+              error={fieldErrors.password}
+            >
+              <input name="password" type="password" value={formData.password} onChange={handleInputChange} required={!editingInstructor} style={styles.input} autoComplete="new-password" />
+            </FormField>
+            <FormField id="instructor-first-name" label="Nombre" help="Solo letras y espacios." error={fieldErrors.first_name}>
+              <input name="first_name" value={formData.first_name} onChange={handleLettersChange} style={styles.input} />
+            </FormField>
+            <FormField id="instructor-last-name" label="Apellido" help="Solo letras y espacios." error={fieldErrors.last_name}>
+              <input name="last_name" value={formData.last_name} onChange={handleLettersChange} style={styles.input} />
+            </FormField>
+            <FormField id="instructor-dni" label="DNI" required help="Solo números, hasta 10 dígitos. No puede repetirse." error={fieldErrors.dni}>
+              <input name="dni" type="text" inputMode="numeric" value={formData.dni} onChange={handleDigitsChange} style={styles.input} required maxLength="10" />
+            </FormField>
+            <FormField id="instructor-specialty" label="Especialidad" help="Opcional. Por ejemplo: Musculación, Spinning." error={fieldErrors.specialty}>
+              <input name="specialty" value={formData.specialty} onChange={handleInputChange} style={styles.input} />
+            </FormField>
+            <FormField id="instructor-email" label="Email" required help="Debe ser un email válido." error={fieldErrors.email}>
+              <input name="email" type="email" value={formData.email} onChange={handleInputChange} style={styles.input} required title="El email debe contener un @ y terminar en .com" />
+            </FormField>
+            <FormField id="instructor-phone" label="Teléfono" help="Opcional. Solo números, espacios y guiones." error={fieldErrors.phone}>
+              <input name="phone" type="tel" value={formData.phone} onChange={handlePhoneChange} style={styles.input} />
+            </FormField>
+            <FormField id="instructor-birth-date" label="Fecha de nacimiento" help="Opcional. No puede ser una fecha futura." error={fieldErrors.birth_date}>
+              <input name="birth_date" type="date" max={new Date().toISOString().split("T")[0]} value={formData.birth_date || ""} onChange={handleInputChange} style={styles.input} />
+            </FormField>
+            <FormField id="instructor-branch" label="Sucursal" required help="Solo podrá dictar clases en esta sucursal." error={fieldErrors.branch_id}>
+              <select name="branch_id" value={formData.branch_id ?? ""} onChange={handleInputChange} required style={styles.input}>
+                <option value="">Seleccionar sucursal</option>
+                {branches.map((branch) => (
+                  <option key={branch.branch_id} value={branch.branch_id}>{branch.location}</option>
+                ))}
+              </select>
+            </FormField>
+            <FormField id="instructor-available-from" label="Disponible desde" required help="Hora de inicio de su turno." error={fieldErrors.available_from}>
+              <input name="available_from" type="time" required value={formData.available_from || ""} onChange={handleInputChange} style={styles.input} />
+            </FormField>
+            <FormField id="instructor-available-to" label="Disponible hasta" required help="Hora de fin del turno. Debe ser posterior a la de inicio." error={fieldErrors.available_to}>
+              <input name="available_to" type="time" required value={formData.available_to || ""} onChange={handleInputChange} style={styles.input} />
+            </FormField>
           </div>
 
           <div style={{ marginTop: "1rem" }}>
@@ -276,7 +336,8 @@ const styles = {
   td: { padding: "12px", borderBottom: "1px solid #ddd" },
   primaryBtn: { padding: "10px 16px", backgroundColor: "#6f42c1", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" },
   formCard: { backgroundColor: "#f8f9fa", padding: "1.5rem", borderRadius: "8px", border: "1px solid #ddd", marginBottom: "1rem" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px" },
+  legend: { margin: "0 0 12px", fontSize: "0.82rem", color: "#64748b" },
   input: { padding: "10px", borderRadius: "6px", border: "1px solid #ccc", width: "100%", boxSizing: "border-box" },
   editBtn: { background: "#2563eb", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
   reactivateBtn: { background: "#22c55e", color: "white", border: "none", padding: "6px 10px", borderRadius: "6px", marginRight: "8px", cursor: "pointer" },
