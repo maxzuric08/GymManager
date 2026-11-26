@@ -31,7 +31,8 @@ En el dashboard configurá los siguientes valores como secretos, nunca en Git:
 | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Credenciales **sandbox** y secreto del webhook de Mercado Pago. |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Recomendaciones IA, exclusivamente del lado servidor. |
 | `DEMO_ADMIN_USERNAME`, `DEMO_ADMIN_PASSWORD` | Cuenta administrativa privada para la demostración. |
-| `DEMO_USER_USERNAME`, `DEMO_USER_PASSWORD`, `DEMO_USER_EMAIL`, `DEMO_USER_DNI` | Cuenta de socio privada para checkout, reservas y notificaciones. |
+| `DEMO_USER_USERNAME`, `DEMO_USER_PASSWORD`, `DEMO_USER_EMAIL`, `DEMO_USER_DNI` | Socio privado sin membresía, destinado al checkout sandbox. |
+| `DEMO_MEMBER_USERNAME`, `DEMO_MEMBER_PASSWORD`, `DEMO_MEMBER_EMAIL`, `DEMO_MEMBER_DNI` | Socio privado con plan activo y una reserva para mostrar el dashboard poblado. |
 | `DB_SSL` | Definila en `true` únicamente si la URL de PostgreSQL elegida exige TLS. |
 
 `VITE_API_URL` es la única variable del frontend y debe contener la URL pública

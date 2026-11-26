@@ -49,6 +49,14 @@ services:
         sync: false
       - key: DEMO_USER_DNI
         sync: false
+      - key: DEMO_MEMBER_USERNAME
+        sync: false
+      - key: DEMO_MEMBER_PASSWORD
+        sync: false
+      - key: DEMO_MEMBER_EMAIL
+        sync: false
+      - key: DEMO_MEMBER_DNI
+        sync: false
 
   - type: web
     name: gymmanager-frontend
