@@ -112,10 +112,10 @@ async function seedDemo() {
     for (const [instructorUsername, className, capacity, startTime, endTime, daysAhead] of classes) {
       const result = await client.query(
         `INSERT INTO classes (instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, status)
-         SELECT $1, $2, $3, $4, $5, $6, ${argentinaToday} + $7, 'active'
+         SELECT $1, $2, $3, $4, $5, $6, ${argentinaToday} + $7::integer, 'active'
          WHERE NOT EXISTS (
            SELECT 1 FROM classes
-           WHERE instructor_id = $1 AND class_name = $3 AND class_date = ${argentinaToday} + $7
+           WHERE instructor_id = $1 AND class_name = $3 AND class_date = ${argentinaToday} + $7::integer
              AND start_time = $5::time AND end_time = $6::time
          )
          RETURNING class_id`,
@@ -123,7 +123,7 @@ async function seedDemo() {
       );
       classIds[className] = result.rows[0]?.class_id || (await client.query(
         `SELECT class_id FROM classes
-         WHERE instructor_id = $1 AND class_name = $2 AND class_date = ${argentinaToday} + $3 AND start_time = $4::time
+         WHERE instructor_id = $1 AND class_name = $2 AND class_date = ${argentinaToday} + $3::integer AND start_time = $4::time
          ORDER BY class_id LIMIT 1`,
         [instructorIds[instructorUsername], className, daysAhead, startTime],
       )).rows[0].class_id;
