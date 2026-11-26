@@ -165,7 +165,9 @@ export async function createPlanRequest(planData) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Error al crear plan");
+    const error = new Error(data.error || "Error al crear plan");
+    error.field = data.field;
+    throw error;
   }
 
   return data;
@@ -280,7 +282,9 @@ export async function updatePlanRequest(id, planData) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || "Error al actualizar plan");
+    const error = new Error(data.error || "Error al actualizar plan");
+    error.field = data.field;
+    throw error;
   }
 
   return data;
