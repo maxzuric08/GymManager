@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { hashPassword } = require("../utils/password");
 const { getArgentinaDate } = require("../utils/argentinaTime");
 
 const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
@@ -74,6 +75,8 @@ const createInstructor = async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
     if (!username || !password) return res.status(400).json({ error: "Usuario y contrasena son obligatorios" });
 
+    const passwordHash = await hashPassword(password);
+
     const result = await pool.query(
       `INSERT INTO instructors
         (username, password, specialty, email, phone, first_name, last_name, dni,
@@ -81,7 +84,7 @@ const createInstructor = async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING instructor_id, username, specialty, email, phone, first_name,
                  last_name, dni, birth_date, branch_id, available_from, available_to, status`,
-      [username, password, specialty, email, phone, first_name, last_name, dni || null,
+      [username, passwordHash, specialty, email, phone, first_name, last_name, dni || null,
        birth_date || null, branch_id || null, available_from || null, available_to || null]
     );
     res.status(201).json(result.rows[0]);
@@ -114,6 +117,8 @@ const updateInstructor = async (req, res) => {
       });
     }
 
+    const passwordHash = password ? await hashPassword(password) : null;
+
     const result = await pool.query(
       `UPDATE instructors
           SET username = $1, password = COALESCE(NULLIF($2, ''), password), specialty = $3,
@@ -122,7 +127,7 @@ const updateInstructor = async (req, res) => {
         WHERE instructor_id = $13
         RETURNING instructor_id, username, specialty, email, phone, first_name,
                   last_name, dni, birth_date, branch_id, available_from, available_to, status`,
-      [username, password || null, specialty, email, phone, first_name, last_name,
+      [username, passwordHash, specialty, email, phone, first_name, last_name,
        dni || null, birth_date || null, branch_id || null, available_from || null,
        available_to || null, id]
     );
