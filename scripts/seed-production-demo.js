@@ -22,6 +22,18 @@ function requiredEnvironment() {
   if (missing.length) throw new Error(`Faltan variables para el demo: ${missing.join(", ")}`);
 }
 
+function argentinaDate(daysAhead) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  const date = new Date(Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day) + daysAhead));
+  return date.toISOString().slice(0, 10);
+}
+
 async function seedDemo() {
   requiredEnvironment();
   const client = await pool.connect();
@@ -100,7 +112,6 @@ async function seedDemo() {
       [["demo.yoga", "demo.funcional", "demo.pilates"]],
     );
     const instructorIds = Object.fromEntries(instructors.rows.map((row) => [row.username, row.instructor_id]));
-    const argentinaToday = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
     const classes = [
       ["demo.yoga", "Yoga Integral", 12, "09:00", "10:00", 1],
       ["demo.funcional", "Entrenamiento Funcional", 10, "18:00", "19:00", 2],
@@ -110,22 +121,23 @@ async function seedDemo() {
 
     const classIds = {};
     for (const [instructorUsername, className, capacity, startTime, endTime, daysAhead] of classes) {
+      const classDate = argentinaDate(daysAhead);
       const result = await client.query(
         `INSERT INTO classes (instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, status)
-         SELECT $1, $2, $3, $4, $5, $6, ${argentinaToday} + $7::integer, 'active'
+         SELECT $1, $2, $3, $4, $5, $6, $7::date, 'active'
          WHERE NOT EXISTS (
            SELECT 1 FROM classes
-           WHERE instructor_id = $1 AND class_name = $3 AND class_date = ${argentinaToday} + $7::integer
+           WHERE instructor_id = $1 AND class_name = $3 AND class_date = $7::date
              AND start_time = $5::time AND end_time = $6::time
          )
          RETURNING class_id`,
-        [instructorIds[instructorUsername], branchId, className, capacity, startTime, endTime, daysAhead],
+        [instructorIds[instructorUsername], branchId, className, capacity, startTime, endTime, classDate],
       );
       classIds[className] = result.rows[0]?.class_id || (await client.query(
         `SELECT class_id FROM classes
-         WHERE instructor_id = $1 AND class_name = $2 AND class_date = ${argentinaToday} + $3::integer AND start_time = $4::time
+         WHERE instructor_id = $1 AND class_name = $2 AND class_date = $3::date AND start_time = $4::time
          ORDER BY class_id LIMIT 1`,
-        [instructorIds[instructorUsername], className, daysAhead, startTime],
+        [instructorIds[instructorUsername], className, classDate, startTime],
       )).rows[0].class_id;
     }
 
