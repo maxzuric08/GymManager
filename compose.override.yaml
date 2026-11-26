@@ -1,0 +1,6 @@
+services:
+  # Docker Compose carga este archivo automáticamente en desarrollo local.
+  # Producción debe ejecutar solo: docker compose -f compose.yaml ...
+  db:
+    volumes:
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-demo-seed.sql:ro
