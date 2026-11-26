@@ -1,5 +1,74 @@
 const pool = require("../db");
 const { getArgentinaDate, getArgentinaTimeShort } = require("../utils/argentinaTime");
+const { sendClassCancellationEmail } = require("../services/emailService");
+
+const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
+const ARGENTINA_SQL_TIME = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::time";
+const UNAVAILABLE_CLASS_STATUSES = ["cancelled", "inactive"];
+const CLASS_DEACTIVATED_REASON = "Clase desactivada por el administrador";
+
+// Cancela las reservas confirmadas de una clase que todavía no empezó. Las de
+// clases ya dictadas se conservan intactas como historial/asistencia.
+async function cancelFutureBookings(client, classId, reason = CLASS_DEACTIVATED_REASON) {
+  const result = await client.query(
+    `UPDATE bookings b
+        SET status = 'cancelled',
+            cancellation_reason = $2
+       FROM classes c
+      WHERE b.class_id = c.class_id
+        AND c.class_id = $1
+        AND b.status = 'confirmed'
+        AND (
+            c.class_date > ${ARGENTINA_SQL_DATE} OR
+            (c.class_date = ${ARGENTINA_SQL_DATE} AND c.start_time > ${ARGENTINA_SQL_TIME})
+        )
+      RETURNING b.booking_id, b.user_id`,
+    [classId, reason]
+  );
+  return result.rows;
+}
+
+// Actualiza la clase y, si queda no disponible, cancela sus reservas en la misma
+// transacción: o se aplican las dos cosas o ninguna.
+async function updateClassAndCancelBookings(updateSql, params, classId, db = pool) {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(updateSql, params);
+    const gymClass = result.rows[0];
+    if (!gymClass) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    const cancelledBookings = UNAVAILABLE_CLASS_STATUSES.includes(gymClass.status)
+      ? await cancelFutureBookings(client, classId)
+      : [];
+    await client.query("COMMIT");
+    return { gymClass, cancelledBookings };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+// El aviso se manda después del COMMIT: si el mail falla, la cancelación igual queda.
+async function notifyCancelledBookings(gymClass, cancelledBookings, db = pool, sendEmail = sendClassCancellationEmail) {
+  if (!cancelledBookings.length) return;
+  const users = await db.query(
+    "SELECT user_id, first_name, email FROM users WHERE user_id = ANY($1::int[]) AND email IS NOT NULL AND BTRIM(email) <> ''",
+    [cancelledBookings.map((booking) => booking.user_id)]
+  );
+  await Promise.allSettled(users.rows.map((user) => sendEmail({
+    userEmail: user.email,
+    userName: user.first_name || "socio",
+    className: gymClass.class_name,
+    classDate: gymClass.class_date,
+    startTime: gymClass.start_time,
+    endTime: gymClass.end_time,
+  })));
+}
 
 function validateClassDateTime(classDate, startTime, endTime) {
   if (!classDate) return "Debes ingresar una fecha para la clase";
@@ -124,16 +193,18 @@ const saveClass = async (req, res, classId = null) => {
   if (assignmentError) return res.status(assignmentError.status).json({ error: assignmentError.error });
 
   if (classId) {
-    const result = await pool.query(
+    const updated = await updateClassAndCancelBookings(
       `UPDATE classes
           SET instructor_id = $1, branch_id = $2, class_name = $3, capacity = $4,
               start_time = $5, end_time = $6, class_date = $7, status = $8
         WHERE class_id = $9
         RETURNING *`,
-      [instructor_id, branch_id, class_name.trim(), Number(capacity), start_time, end_time, class_date, status || "scheduled", classId]
+      [instructor_id, branch_id, class_name.trim(), Number(capacity), start_time, end_time, class_date, status || "scheduled", classId],
+      classId
     );
-    if (!result.rows[0]) return res.status(404).json({ error: "Clase no encontrada" });
-    return res.json(result.rows[0]);
+    if (!updated) return res.status(404).json({ error: "Clase no encontrada" });
+    await notifyCancelledBookings(updated.gymClass, updated.cancelledBookings).catch((error) => console.error("Error avisando cancelaciones:", error));
+    return res.json({ ...updated.gymClass, cancelled_bookings: updated.cancelledBookings.length });
   }
 
   const result = await pool.query(
@@ -166,12 +237,21 @@ const updateClass = async (req, res) => {
 
 const deleteClass = async (req, res) => {
   try {
-    const result = await pool.query(
+    const updated = await updateClassAndCancelBookings(
       "UPDATE classes SET status = 'inactive' WHERE class_id = $1 RETURNING *",
-      [req.params.id]
+      [req.params.id],
+      req.params.id
     );
-    if (!result.rows[0]) return res.status(404).json({ error: "Clase no encontrada" });
-    return res.json({ message: "Clase desactivada", class: result.rows[0] });
+    if (!updated) return res.status(404).json({ error: "Clase no encontrada" });
+    await notifyCancelledBookings(updated.gymClass, updated.cancelledBookings).catch((error) => console.error("Error avisando cancelaciones:", error));
+    const count = updated.cancelledBookings.length;
+    return res.json({
+      message: count
+        ? `Clase desactivada. Se cancelaron ${count} reserva(s) y se avisó a los socios.`
+        : "Clase desactivada",
+      class: updated.gymClass,
+      cancelled_bookings: count,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Error al desactivar la clase" });
@@ -185,11 +265,25 @@ const reactivateClass = async (req, res) => {
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: "Clase no encontrada" });
-    return res.json({ message: "Clase reactivada", class: result.rows[0] });
+    // Política: las reservas canceladas NO se restauran. Los socios ya fueron
+    // avisados y pudieron reservar otra cosa, así que deben reservar de nuevo.
+    return res.json({
+      message: "Clase reactivada. Las reservas canceladas no se restauran: los socios deben reservar nuevamente.",
+      class: result.rows[0],
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Error al reactivar la clase" });
   }
 };
 
-module.exports = { getClasses, createClass, updateClass, deleteClass, reactivateClass };
+module.exports = {
+  getClasses,
+  createClass,
+  updateClass,
+  deleteClass,
+  reactivateClass,
+  cancelFutureBookings,
+  updateClassAndCancelBookings,
+  notifyCancelledBookings,
+};

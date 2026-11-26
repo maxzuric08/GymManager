@@ -11,6 +11,7 @@ app.get("/", (req, res) => {
 app.use("/auth", require("./routes/auth.routes"));
 app.use("/users", require("./routes/users.routes"));
 app.use("/plans", require("./routes/plans.routes"));
+app.use("/branches", require("./routes/branches.routes"));
 app.use("/instructors", require("./routes/instructors.routes"));
 app.use("/classes", require("./routes/classes.routes"));
 app.use("/bookings", require("./routes/bookings.routes"));
@@ -18,5 +19,6 @@ app.use("/attendance", require("./routes/attendance.routes"));
 app.use("/medical-certificates", require("./routes/medicalCertificates.routes"));
 app.use("/notifications", require("./routes/notifications.routes"));
 app.use("/payments", require("./routes/payments.routes"));
+app.use("/recommendations", require("./routes/recommendations.routes"));
 
 module.exports = app;

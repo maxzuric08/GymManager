@@ -2,23 +2,10 @@
 -- Es seguro ejecutar este archivo más de una vez: reutiliza cada entidad demo
 -- mediante sus claves funcionales y no depende de IDs seriales.
 
-INSERT INTO administrators (
-    username, password, hierarchy, first_name, last_name, email, phone
-)
-VALUES (
-    'admin1', '123456', 'superadmin', 'Admin', 'Principal', 'admin@gym.com', '111111111'
-)
-ON CONFLICT (username) DO UPDATE
-SET password = EXCLUDED.password,
-    hierarchy = EXCLUDED.hierarchy,
-    first_name = EXCLUDED.first_name,
-    last_name = EXCLUDED.last_name,
-    email = EXCLUDED.email,
-    phone = EXCLUDED.phone;
-
 DO $$
 DECLARE
     argentina_today DATE := (CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date;
+    demo_password_hash TEXT := '$2b$10$SBBCyYX7n5veJEUe3RBaQeo1apeZRTTe9OjPcCQ.S/Pq0Nj2MEyfS'; -- hash bcrypt de "123456"
     demo_branch_id INTEGER;
     demo_plan_id INTEGER;
     yoga_instructor_id INTEGER;
@@ -29,6 +16,20 @@ DECLARE
     spinning_class_id INTEGER;
     existing_booking_id INTEGER;
 BEGIN
+    INSERT INTO administrators (
+        username, password, hierarchy, first_name, last_name, email, phone
+    )
+    VALUES (
+        'admin1', demo_password_hash, 'superadmin', 'Admin', 'Principal', 'admin@gym.com', '111111111'
+    )
+    ON CONFLICT (username) DO UPDATE
+    SET password = EXCLUDED.password,
+        hierarchy = EXCLUDED.hierarchy,
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        email = EXCLUDED.email,
+        phone = EXCLUDED.phone;
+
     INSERT INTO branches (location, size)
     SELECT 'Pilar', 'Grande'
     WHERE NOT EXISTS (
@@ -60,7 +61,7 @@ BEGIN
         email, phone, birth_date, user_status, plan_expiration_date
     )
     VALUES (
-        demo_branch_id, demo_plan_id, 'juan123', '123456', '12345678', 'Juan', 'Perez',
+        demo_branch_id, demo_plan_id, 'juan123', demo_password_hash, '12345678', 'Juan', 'Perez',
         'juan@gmail.com', '123456789', '1995-06-10', 'active', argentina_today + 30
     )
     ON CONFLICT (username) DO UPDATE
@@ -81,10 +82,10 @@ BEGIN
         birth_date, branch_id, available_from, available_to, status
     )
     VALUES
-        ('sofia.yoga', '123456', 'Yoga y movilidad', 'sofia.yoga@gym.com', '111111112', 'Sofia', 'Lopez', '30111222', '1990-04-12', demo_branch_id, '08:00', '13:00', 'active'),
-        ('valentina.funcional', '123456', 'Entrenamiento funcional y spinning', 'valentina.funcional@gym.com', '111111113', 'Valentina', 'Diaz', '31222333', '1988-08-23', demo_branch_id, '17:00', '21:00', 'active'),
-        ('martin.pilates', '123456', 'Pilates', 'martin.pilates@gym.com', '111111114', 'Martin', 'Suarez', '32333444', '1985-11-30', demo_branch_id, '18:00', '21:00', 'active'),
-        ('lucas.cross', '123456', 'Cross training', 'lucas.cross@gym.com', '111111115', 'Lucas', 'Mendez', '33444555', '1987-02-14', demo_branch_id, '08:00', '12:00', 'inactive')
+        ('sofia.yoga', demo_password_hash, 'Yoga y movilidad', 'sofia.yoga@gym.com', '111111112', 'Sofia', 'Lopez', '30111222', '1990-04-12', demo_branch_id, '08:00', '13:00', 'active'),
+        ('valentina.funcional', demo_password_hash, 'Entrenamiento funcional y spinning', 'valentina.funcional@gym.com', '111111113', 'Valentina', 'Diaz', '31222333', '1988-08-23', demo_branch_id, '17:00', '21:00', 'active'),
+        ('martin.pilates', demo_password_hash, 'Pilates', 'martin.pilates@gym.com', '111111114', 'Martin', 'Suarez', '32333444', '1985-11-30', demo_branch_id, '18:00', '21:00', 'active'),
+        ('lucas.cross', demo_password_hash, 'Cross training', 'lucas.cross@gym.com', '111111115', 'Lucas', 'Mendez', '33444555', '1987-02-14', demo_branch_id, '08:00', '12:00', 'inactive')
     ON CONFLICT (username) DO UPDATE
     SET password = EXCLUDED.password,
         specialty = EXCLUDED.specialty,

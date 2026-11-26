@@ -121,6 +121,23 @@ export async function createInstructorRequest(instructorData) {
   return data;
 }
 
+export async function getBranchesRequest() {
+  const response = await apiFetch(`${API_URL}/branches`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Error al obtener sucursales");
+  }
+
+  return data;
+}
+
 export async function getPlansRequest() {
   const response = await apiFetch(`${API_URL}/plans`, {
     method: "GET",
@@ -625,5 +642,18 @@ export async function getInstructorAttendanceHistoryRequest(dateFrom, dateTo) {
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Error al obtener historial de asistencia");
+  return data;
+}
+
+export async function getRecommendationsRequest(message) {
+  const response = await apiFetch(`${API_URL}/recommendations`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ message }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "No pudimos obtener recomendaciones en este momento.");
+  }
   return data;
 }

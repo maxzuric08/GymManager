@@ -31,7 +31,7 @@ El backend y PostgreSQL se pueden ejecutar sin instalar PostgreSQL localmente. E
    Copy-Item .env.example .env
    ```
 
-2. Reemplazá `POSTGRES_PASSWORD` y `JWT_SECRET` por valores locales propios. Completá las variables de correo o Mercado Pago únicamente si vas a usar esas integraciones.
+2. Reemplazá `POSTGRES_PASSWORD` y `JWT_SECRET` por valores locales propios. Completá las variables de correo, Mercado Pago u OpenAI únicamente si vas a usar esas integraciones. Para las recomendaciones, configurá `OPENAI_API_KEY` y opcionalmente `OPENAI_MODEL` (por defecto, `gpt-6-luna`).
 
 El archivo `.env` está ignorado por Git. No subas secretos: solo se versiona `.env.example` con valores de ejemplo.
 
@@ -101,3 +101,13 @@ docker compose exec backend npm run db:migrate
 ```
 
 El comando puede ejecutarse nuevamente sin volver a crear las tablas o columnas que ya existen.
+
+### Contraseñas
+
+Las contraseñas se guardan con hash bcrypt. Si tu base tiene contraseñas anteriores en texto plano, convertilas con:
+
+```powershell
+docker compose exec backend npm run db:hash-passwords
+```
+
+El comando es idempotente: saltea las que ya están hasheadas. Además, el login convierte automáticamente a hash cualquier contraseña en texto plano que quede, la primera vez que esa persona inicia sesión.

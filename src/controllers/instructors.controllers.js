@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { hashPassword } = require("../utils/password");
 const { getArgentinaDate } = require("../utils/argentinaTime");
 
 const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
@@ -74,6 +75,8 @@ const createInstructor = async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
     if (!username || !password) return res.status(400).json({ error: "Usuario y contrasena son obligatorios" });
 
+    const passwordHash = await hashPassword(password);
+
     const result = await pool.query(
       `INSERT INTO instructors
         (username, password, specialty, email, phone, first_name, last_name, dni,
@@ -81,7 +84,7 @@ const createInstructor = async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        RETURNING instructor_id, username, specialty, email, phone, first_name,
                  last_name, dni, birth_date, branch_id, available_from, available_to, status`,
-      [username, password, specialty, email, phone, first_name, last_name, dni || null,
+      [username, passwordHash, specialty, email, phone, first_name, last_name, dni || null,
        birth_date || null, branch_id || null, available_from || null, available_to || null]
     );
     res.status(201).json(result.rows[0]);
@@ -114,6 +117,8 @@ const updateInstructor = async (req, res) => {
       });
     }
 
+    const passwordHash = password ? await hashPassword(password) : null;
+
     const result = await pool.query(
       `UPDATE instructors
           SET username = $1, password = COALESCE(NULLIF($2, ''), password), specialty = $3,
@@ -122,7 +127,7 @@ const updateInstructor = async (req, res) => {
         WHERE instructor_id = $13
         RETURNING instructor_id, username, specialty, email, phone, first_name,
                   last_name, dni, birth_date, branch_id, available_from, available_to, status`,
-      [username, password || null, specialty, email, phone, first_name, last_name,
+      [username, passwordHash, specialty, email, phone, first_name, last_name,
        dni || null, birth_date || null, branch_id || null, available_from || null,
        available_to || null, id]
     );
@@ -135,12 +140,17 @@ const updateInstructor = async (req, res) => {
   }
 };
 
-async function findNextFutureClass(instructorId) {
-  const result = await pool.query(
+// Una clase bloquea la baja solo si todavía no terminó (hora Argentina):
+// las clases de días anteriores o de hoy ya finalizadas son historial.
+async function findNextFutureClass(instructorId, db = pool) {
+  const result = await db.query(
     `SELECT class_name, class_date, start_time
        FROM classes
       WHERE instructor_id = $1
-        AND class_date >= ${ARGENTINA_SQL_DATE}
+        AND (
+          class_date > ${ARGENTINA_SQL_DATE} OR
+          (class_date = ${ARGENTINA_SQL_DATE} AND end_time > ${ARGENTINA_SQL_TIME})
+        )
         AND status NOT IN ('cancelled', 'inactive')
       ORDER BY class_date, start_time
       LIMIT 1`,
@@ -149,11 +159,12 @@ async function findNextFutureClass(instructorId) {
   return result.rows[0] || null;
 }
 
-async function ensureInstructorCanBeDeactivated(instructorId) {
-  const futureClass = await findNextFutureClass(instructorId);
+async function ensureInstructorCanBeDeactivated(instructorId, db = pool) {
+  const futureClass = await findNextFutureClass(instructorId, db);
   if (!futureClass) return null;
-  return `No se puede desactivar: tiene la clase ${futureClass.class_name} el ${new Date(futureClass.class_date).toLocaleDateString("es-AR")} a las ${futureClass.start_time.slice(0, 5)}`;
+  return `No se puede desactivar: tiene la clase ${futureClass.class_name} el ${new Date(futureClass.class_date).toLocaleDateString("es-AR")} a las ${futureClass.start_time.slice(0, 5)}. Reasignala o cancelala antes de desactivar al instructor.`;
 }
+
 const deleteInstructor = async (req, res) => {
   try {
     const conflict = await ensureInstructorCanBeDeactivated(req.params.id);
@@ -267,6 +278,8 @@ const updateMyAvailability = async (req, res) => {
 };
 
 module.exports = {
+  findNextFutureClass,
+  ensureInstructorCanBeDeactivated,
   getInstructors,
   createInstructor,
   updateInstructor,

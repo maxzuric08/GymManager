@@ -1,26 +1,42 @@
 const pool = require("../db");
 const jwt = require("jsonwebtoken");
+const { hashPassword, verifyPassword } = require("../utils/password");
+
+const ROLE_TABLES = {
+    admin: { table: "administrators", id: "admin_id" },
+    instructor: { table: "instructors", id: "instructor_id" },
+    user: { table: "users", id: "user_id" },
+};
 
 const login = async (req, res) => {
     try {
         const { username, password, role } = req.body;
 
-        let query = "";
-
-        if (role === "admin") {
-            query = "SELECT * FROM administrators WHERE username = $1 AND password = $2";
-        } else if (role === "instructor") {
-            query = "SELECT * FROM instructors WHERE username = $1 AND password = $2";
-        } else if (role === "user") {
-            query = "SELECT * FROM users WHERE username = $1 AND password = $2";
-        } else {
+        const roleTable = Object.hasOwn(ROLE_TABLES, role) ? ROLE_TABLES[role] : null;
+        if (!roleTable) {
             return res.status(400).json({ error: "Rol inválido" });
         }
 
-        const result = await pool.query(query, [username, password]);
+        const result = await pool.query(
+            `SELECT * FROM ${roleTable.table} WHERE username = $1`,
+            [username]
+        );
 
-        if (result.rows.length === 0) {
+        const found = result.rows[0];
+        const { valid, needsRehash } = found
+            ? await verifyPassword(password, found.password)
+            : { valid: false, needsRehash: false };
+
+        if (!valid) {
             return res.status(401).json({ error: "Credenciales incorrectas" });
+        }
+
+        // Contraseña legacy en texto plano: se convierte a hash en el primer login exitoso.
+        if (needsRehash) {
+            await pool.query(
+                `UPDATE ${roleTable.table} SET password = $1 WHERE ${roleTable.id} = $2`,
+                [await hashPassword(password), found[roleTable.id]]
+            );
         }
 
         const user = result.rows[0];

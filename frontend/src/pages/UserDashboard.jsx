@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import MembershipPanel from "../components/user/MembershipPanel";
+import RecommendationsPanel from "../components/user/RecommendationsPanel";
 import Modal from "../components/Modal";
 import {
   getPlansRequest,
@@ -266,6 +267,16 @@ export default function UserDashboard() {
 
           <button
               onClick={() => {
+                setActiveTab("recommendations");
+                clearMessages();
+              }}
+              style={activeTab === "recommendations" ? styles.activeTab : styles.tab}
+          >
+            Recomendaciones
+          </button>
+
+          <button
+              onClick={() => {
                 setActiveTab("membership");
                 clearMessages();
               }}
@@ -400,6 +411,8 @@ export default function UserDashboard() {
                 onMembershipUpdated={handleMembershipUpdated}
             />
         )}
+
+        {activeTab === "recommendations" && <RecommendationsPanel />}
         {activeTab === "medical-certificate" && (
             <div>
               <div

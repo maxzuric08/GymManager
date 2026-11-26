@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { hashPassword } = require("../utils/password");
 const {
   assignMembership,
   getActivePlan,
@@ -72,6 +73,8 @@ const createUser = async (req, res) => {
     const validationError = validateUserData(req.body, { passwordRequired: true });
     if (validationError) return res.status(400).json({ error: validationError });
 
+    const passwordHash = await hashPassword(password);
+
     await client.query("BEGIN");
     if (!(await branchExists(branch_id, client))) {
       await client.query("ROLLBACK");
@@ -92,7 +95,7 @@ const createUser = async (req, res) => {
        RETURNING user_id, branch_id, plan_id, username, dni, first_name,
                  last_name, email, phone, user_status, birth_date,
                  registration_date, plan_expiration_date`,
-      [branch_id || null, plan_id || null, username.trim(), password, dni,
+      [branch_id || null, plan_id || null, username.trim(), passwordHash, dni,
        first_name, last_name, email, phone, birth_date || null, null]
     );
 
@@ -125,6 +128,8 @@ const updateUser = async (req, res) => {
 
     const validationError = validateUserData(req.body);
     if (validationError) return res.status(400).json({ error: validationError });
+
+    const passwordHash = password ? await hashPassword(password) : null;
 
     await client.query("BEGIN");
     const existingResult = await client.query(
@@ -176,7 +181,7 @@ const updateUser = async (req, res) => {
         RETURNING user_id, branch_id, plan_id, username, dni, first_name,
                   last_name, email, phone, user_status, birth_date,
                   registration_date, plan_expiration_date`,
-      [branch_id || null, normalizedPlanId, username.trim(), password || null,
+      [branch_id || null, normalizedPlanId, username.trim(), passwordHash,
        dni, first_name, last_name, email, phone, birth_date || null,
        expirationDate, id]
     );

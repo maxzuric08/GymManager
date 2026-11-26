@@ -117,7 +117,41 @@ const sendMembershipConfirmationEmail = async (details) => {
   }
 };
 
+const formatClassTime = (value) => String(value || "").slice(0, 5);
+
+const buildClassCancellationEmail = ({ userEmail, userName, className, classDate, startTime, endTime }) => ({
+  from: process.env.EMAIL_USER,
+  to: userEmail,
+  subject: "⚠️ Tu reserva fue cancelada",
+  html: `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #dd6b20 0%, #c05621 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0;">Clase cancelada</h1>
+        <p style="margin: 10px 0 0 0;">Tu reserva ya no está activa.</p>
+      </div>
+      <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
+        <p>Hola <strong>${escapeHtml(userName)}</strong>,</p>
+        <p>Lamentamos avisarte que la clase <strong>${escapeHtml(className)}</strong> del <strong>${formatDate(classDate)}</strong> de ${formatClassTime(startTime)} a ${formatClassTime(endTime)} fue desactivada, por lo que tu reserva se canceló.</p>
+        <p>La cancelación no consume tu límite de reservas: podés reservar otra clase desde tu panel.</p>
+        <p style="color: #666; font-size: 12px; margin-top: 30px;">Este es un mensaje automatico de GymManager.</p>
+      </div>
+    </div>
+  `,
+});
+
+const sendClassCancellationEmail = async (details) => {
+  try {
+    await transporter.sendMail(buildClassCancellationEmail(details));
+    return true;
+  } catch (error) {
+    console.error("Error enviando el aviso de clase cancelada:", error);
+    return false;
+  }
+};
+
 module.exports = {
+  buildClassCancellationEmail,
+  sendClassCancellationEmail,
   sendMembershipExpirationEmail,
   buildMembershipConfirmationEmail,
   sendMembershipConfirmationEmail,
