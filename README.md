@@ -77,3 +77,13 @@ docker compose exec backend npm run db:migrate
 ```
 
 El comando puede ejecutarse nuevamente sin volver a crear las tablas o columnas que ya existen.
+
+### Contraseñas
+
+Las contraseñas se guardan con hash bcrypt. Si tu base tiene contraseñas anteriores en texto plano, convertilas con:
+
+```powershell
+docker compose exec backend npm run db:hash-passwords
+```
+
+El comando es idempotente: saltea las que ya están hasheadas. Además, el login convierte automáticamente a hash cualquier contraseña en texto plano que quede, la primera vez que esa persona inicia sesión.

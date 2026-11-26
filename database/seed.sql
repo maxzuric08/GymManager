@@ -12,7 +12,7 @@ INSERT INTO administrators (
 )
 VALUES (
            'admin1',
-           '123456',
+           '$2b$10$SBBCyYX7n5veJEUe3RBaQeo1apeZRTTe9OjPcCQ.S/Pq0Nj2MEyfS', -- hash bcrypt de "123456"
            'superadmin',
            'Admin',
            'Principal',
@@ -51,7 +51,7 @@ VALUES (
            1,  -- viene de branches
            1,  -- viene de plans
            'juan123',
-           '123456',
+           '$2b$10$SBBCyYX7n5veJEUe3RBaQeo1apeZRTTe9OjPcCQ.S/Pq0Nj2MEyfS', -- hash bcrypt de "123456"
            '12345678',
            'Juan',
            'Perez',
