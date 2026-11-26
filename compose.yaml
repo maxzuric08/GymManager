@@ -37,6 +37,8 @@ services:
       MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET}
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-luna}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     depends_on:

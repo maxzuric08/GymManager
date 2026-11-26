@@ -644,3 +644,16 @@ export async function getInstructorAttendanceHistoryRequest(dateFrom, dateTo) {
   if (!response.ok) throw new Error(data.error || "Error al obtener historial de asistencia");
   return data;
 }
+
+export async function getRecommendationsRequest(message) {
+  const response = await apiFetch(`${API_URL}/recommendations`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ message }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || "No pudimos obtener recomendaciones en este momento.");
+  }
+  return data;
+}
