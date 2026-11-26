@@ -118,7 +118,8 @@ function validateRecurrence({ frequency, weekdays, start_date, end_date }) {
   if (!DATE_PATTERN.test(start_date || "") || !DATE_PATTERN.test(end_date || "")) return "Debes indicar fecha de inicio y de fin";
   if (!isRealDate(start_date) || !isRealDate(end_date)) return "Las fechas indicadas no son válidas";
   if (end_date < start_date) return "La fecha de fin no puede ser anterior a la de inicio";
-  if ((toUtcMs(end_date) - toUtcMs(start_date)) / DAY_MS > MAX_RECURRENCE_DAYS) {
+  // +1 porque el período incluye ambos extremos
+  if ((toUtcMs(end_date) - toUtcMs(start_date)) / DAY_MS + 1 > MAX_RECURRENCE_DAYS) {
     return `El período no puede superar ${MAX_RECURRENCE_DAYS} días`;
   }
   return null;

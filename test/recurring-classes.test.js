@@ -96,6 +96,14 @@ test("validateRecurrence rechaza configuraciones inválidas", () => {
   assert.match(validateRecurrence({ ...ok, start_date: "2099-02-31" }), /no son válidas/);
 });
 
+test("el máximo de 366 días cuenta ambos extremos", () => {
+  const base = { weekdays: [1], start_date: "2099-01-01" };
+  // 2099-01-01 a 2100-01-01 son 366 fechas: dentro del máximo
+  assert.equal(validateRecurrence({ ...base, end_date: "2100-01-01" }), null);
+  // un día más son 367 fechas: excede el máximo
+  assert.match(validateRecurrence({ ...base, end_date: "2100-01-02" }), /no puede superar 366 días/);
+});
+
 test("crea una instancia por cada fecha válida dentro de una transacción", async () => {
   const { res, db } = await run(baseBody());
 
