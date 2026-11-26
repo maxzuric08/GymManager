@@ -3,6 +3,7 @@ const pool = require("../db");
 
 const ARGENTINA_SQL_DATE = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::date";
 const ARGENTINA_SQL_TIME = "(CURRENT_TIMESTAMP AT TIME ZONE 'America/Argentina/Buenos_Aires')::time";
+const MAX_CATALOG_CLASSES = 100;
 const NO_RESULTS_MESSAGE = "No encontré clases con cupos disponibles que coincidan con tu consulta por ahora. Podés revisar la cartelera más tarde o probar con otro horario u objetivo.";
 const DISCLAIMER = "Esta sugerencia es orientativa y se basa en la oferta disponible del gimnasio.";
 
@@ -42,7 +43,8 @@ async function getAvailableFutureClasses(db = pool) {
     HAVING c.capacity IS NULL
         OR COUNT(b.booking_id) FILTER (WHERE b.status = 'confirmed') < c.capacity
   ORDER BY c.class_date ASC, c.start_time ASC
-  `);
+  LIMIT $1
+  `, [MAX_CATALOG_CLASSES]);
 
   return result.rows.map((gymClass) => ({
     ...gymClass,
@@ -196,6 +198,7 @@ async function getRecommendations({ message, db = pool, client, model = process.
 
 module.exports = {
   DISCLAIMER,
+  MAX_CATALOG_CLASSES,
   NO_RESULTS_MESSAGE,
   RecommendationProviderError,
   buildCatalogContext,
