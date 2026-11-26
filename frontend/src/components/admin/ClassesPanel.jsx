@@ -15,6 +15,7 @@ const getClassDisplayStatus = (cls) => {
 import {
   getClassesRequest,
   createClassRequest,
+  createRecurringClassesRequest,
   updateClassRequest,
   deleteClassRequest,
   reactivateClassRequest,
@@ -22,6 +23,20 @@ import {
   getBranchesRequest,
   getClassStudentsRequest,
 } from "../../services/api";
+
+const WEEKDAYS = [
+  { value: 1, label: "Lunes" },
+  { value: 2, label: "Martes" },
+  { value: 3, label: "Miércoles" },
+  { value: 4, label: "Jueves" },
+  { value: 5, label: "Viernes" },
+  { value: 6, label: "Sábado" },
+  { value: 0, label: "Domingo" },
+];
+
+const formatShortDate = (dateStr) => new Date(`${dateStr}T12:00:00`).toLocaleDateString("es-AR", {
+  weekday: "short", day: "numeric", month: "short", year: "numeric",
+});
 
 // Cada regla asocia un fragmento del mensaje del backend con el campo afectado.
 const ERROR_FIELD_RULES = [
@@ -38,6 +53,10 @@ export default function ClassesPanel() {
   const [instructors, setInstructors] = useState([]);
   const [branches, setBranches] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [recurring, setRecurring] = useState(false);
+  const [weekdays, setWeekdays] = useState([]);
+  const [endDate, setEndDate] = useState("");
+  const [recurrenceResult, setRecurrenceResult] = useState(null);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingClass, setEditingClass] = useState(null);
@@ -128,6 +147,17 @@ export default function ClassesPanel() {
 
   const handleInputChange = (e) => setField(e.target.name, e.target.value);
 
+  const resetRecurrence = () => {
+    setRecurring(false);
+    setWeekdays([]);
+    setEndDate("");
+  };
+
+  const toggleWeekday = (value) => {
+    setWeekdays((current) => (current.includes(value) ? current.filter((day) => day !== value) : [...current, value]));
+    setFieldErrors((current) => (current.weekdays ? { ...current, weekdays: undefined } : current));
+  };
+
   const handleBranchChange = (e) => {
     setField("branch_id", e.target.value);
     setField("instructor_id", "");
@@ -136,6 +166,7 @@ export default function ClassesPanel() {
   const handleNewClass = () => {
     setEditingClass(null);
     setFieldErrors({});
+    resetRecurrence();
     setShowForm(true);
 
     setFormData({
@@ -153,6 +184,7 @@ export default function ClassesPanel() {
   const handleEdit = (cls) => {
     setEditingClass(cls.class_id);
     setFieldErrors({});
+    resetRecurrence();
     setShowForm(true);
 
     setFormData({
@@ -239,6 +271,17 @@ const handleSubmit = async (e) => {
     errors.start_time = "No puedes crear una clase hoy en una hora que ya pasó";
   }
 
+  if (recurring && !editingClass) {
+    if (weekdays.length === 0) {
+      errors.weekdays = "Elegí al menos un día de la semana";
+    }
+    if (!endDate) {
+      errors.end_date = "Debes seleccionar la fecha de fin";
+    } else if (formData.class_date && endDate < formData.class_date) {
+      errors.end_date = "La fecha de fin no puede ser anterior a la de inicio";
+    }
+  }
+
   if (Object.keys(errors).length > 0) {
     setFieldErrors(errors);
     return;
@@ -257,12 +300,21 @@ const handleSubmit = async (e) => {
   try {
     if (editingClass) {
       await updateClassRequest(editingClass, payload);
+    } else if (recurring) {
+      const result = await createRecurringClassesRequest({
+        ...payload,
+        frequency: "weekly",
+        weekdays,
+        end_date: endDate,
+      });
+      setRecurrenceResult({ message: result.message, created: result.created, conflicts: result.conflicts });
     } else {
       await createClassRequest(payload);
     }
 
     setShowForm(false);
     setEditingClass(null);
+    resetRecurrence();
     fetchClasses();
 
     setFormData({
@@ -276,6 +328,11 @@ const handleSubmit = async (e) => {
       status: "active",
     });
   } catch (err) {
+    if (err.conflicts?.length) {
+      setRecurrenceResult({ message: err.message, created: [], conflicts: err.conflicts });
+      fetchClasses();
+      return;
+    }
     const field = mapErrorToField(err.message, ERROR_FIELD_RULES);
     if (field) {
       setFieldErrors({ [field]: err.message });
@@ -364,7 +421,7 @@ const handleSubmit = async (e) => {
               />
             </FormField>
 
-            <FormField id="class-date" label="Fecha" required help="No puede ser una fecha pasada." error={fieldErrors.class_date}>
+            <FormField id="class-date" label={recurring && !editingClass ? "Fecha de inicio" : "Fecha"} required help={recurring && !editingClass ? "Primer día del período. No puede ser pasada." : "No puede ser una fecha pasada."} error={fieldErrors.class_date}>
               <input
                 name="class_date"
                 type="date"
@@ -435,6 +492,56 @@ const handleSubmit = async (e) => {
               </select>
             </FormField>
 
+            {!editingClass && (
+              <div style={styles.recurrenceBox}>
+                <label style={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={recurring}
+                    onChange={(e) => setRecurring(e.target.checked)}
+                  />
+                  Repetir semanalmente
+                </label>
+
+                {recurring && (
+                  <>
+                    <fieldset style={styles.fieldset} aria-describedby="class-weekdays-help">
+                      <legend style={styles.legendLabel}>Días de la semana <span aria-hidden="true" style={{ color: "#b91c1c" }}>*</span></legend>
+                      <div style={styles.weekdayRow}>
+                        {WEEKDAYS.map((day) => (
+                          <label key={day.value} style={styles.checkboxLabel}>
+                            <input
+                              type="checkbox"
+                              checked={weekdays.includes(day.value)}
+                              onChange={() => toggleWeekday(day.value)}
+                            />
+                            {day.label}
+                          </label>
+                        ))}
+                      </div>
+                      <small id="class-weekdays-help" style={{ color: "#64748b" }}>
+                        Se crea una clase por cada día elegido entre la fecha de inicio y la de fin.
+                      </small>
+                      {fieldErrors.weekdays && <small role="alert" style={{ color: "#b91c1c", fontWeight: 600 }}>{fieldErrors.weekdays}</small>}
+                    </fieldset>
+
+                    <FormField id="class-end-date" label="Repetir hasta" required help="Último día del período (máximo 366 días y 60 clases)." error={fieldErrors.end_date}>
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={formData.class_date || getArgentinaDate()}
+                        onChange={(e) => {
+                          setEndDate(e.target.value);
+                          setFieldErrors((current) => (current.end_date ? { ...current, end_date: undefined } : current));
+                        }}
+                        style={styles.input}
+                      />
+                    </FormField>
+                  </>
+                )}
+              </div>
+            )}
+
             <FormField id="class-status" label="Estado" help="Cancelada o inactiva ocultan la clase para nuevas reservas." error={fieldErrors.status}>
               <select
                 name="status"
@@ -453,9 +560,38 @@ const handleSubmit = async (e) => {
             type="submit"
             style={{ ...styles.primaryBtn, marginTop: "1rem" }}
           >
-            {editingClass ? "Actualizar Clase" : "Guardar Clase"}
+            {editingClass ? "Actualizar Clase" : recurring ? "Crear clases recurrentes" : "Guardar Clase"}
           </button>
         </form>
+      )}
+
+      {recurrenceResult && (
+        <section style={styles.resultCard} role="status" aria-label="Resultado de la recurrencia">
+          <div style={styles.resultHeader}>
+            <strong>{recurrenceResult.message}</strong>
+            <button type="button" onClick={() => setRecurrenceResult(null)} style={styles.closeBtn} aria-label="Cerrar resultado">✕</button>
+          </div>
+          {recurrenceResult.created.length > 0 && (
+            <>
+              <p style={styles.resultTitle}>Clases creadas ({recurrenceResult.created.length})</p>
+              <ul style={styles.resultList}>
+                {recurrenceResult.created.map((cls) => (
+                  <li key={cls.class_id}>{formatShortDate(String(cls.class_date).slice(0, 10))} · {String(cls.start_time).slice(0, 5)} a {String(cls.end_time).slice(0, 5)}</li>
+                ))}
+              </ul>
+            </>
+          )}
+          {recurrenceResult.conflicts.length > 0 && (
+            <>
+              <p style={{ ...styles.resultTitle, color: "#b91c1c" }}>No se crearon ({recurrenceResult.conflicts.length})</p>
+              <ul style={styles.resultList}>
+                {recurrenceResult.conflicts.map((conflict) => (
+                  <li key={conflict.class_date}><strong>{formatShortDate(conflict.class_date)}:</strong> {conflict.error}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
       )}
 
       <table style={styles.table}>
@@ -638,6 +774,16 @@ const styles = {
     gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
     gap: "14px",
   },
+  recurrenceBox: { gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: "12px", padding: "12px", border: "1px dashed #94a3b8", borderRadius: "8px", background: "#fff" },
+  checkboxLabel: { display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "0.9rem", fontWeight: 600, color: "#1e293b" },
+  fieldset: { border: 0, padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" },
+  legendLabel: { fontSize: "0.85rem", fontWeight: 600, color: "#1e293b", padding: 0, marginBottom: "6px" },
+  weekdayRow: { display: "flex", flexWrap: "wrap", gap: "6px 16px" },
+  resultCard: { background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: "8px", padding: "12px 16px", marginBottom: "1rem" },
+  resultHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" },
+  resultTitle: { margin: "10px 0 4px", fontWeight: 700, fontSize: "0.9rem", color: "#166534" },
+  resultList: { margin: 0, paddingLeft: "20px", fontSize: "0.88rem", lineHeight: 1.5, maxHeight: "160px", overflowY: "auto" },
+  closeBtn: { border: 0, background: "#e2e8f0", borderRadius: "6px", width: "28px", height: "28px", cursor: "pointer" },
   legend: { margin: "0 0 12px", fontSize: "0.82rem", color: "#64748b" },
   input: {
     padding: "10px",

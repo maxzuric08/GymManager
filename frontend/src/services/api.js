@@ -204,6 +204,26 @@ export async function createClassRequest(classData) {
   return data;
 }
 
+// Crea una clase por cada fecha de la recurrencia. Si ninguna se pudo crear, el
+// error lleva los conflictos en `error.conflicts` para mostrarlos al admin.
+export async function createRecurringClassesRequest(classData) {
+  const response = await apiFetch(`${API_URL}/classes/recurring`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(classData),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const error = new Error(data.error || "Error al crear las clases recurrentes");
+    error.conflicts = data.conflicts || [];
+    throw error;
+  }
+
+  return data;
+}
+
 export async function updateUserRequest(id, userData) {
   const response = await apiFetch(`${API_URL}/users/${id}`, {
     method: "PUT",
