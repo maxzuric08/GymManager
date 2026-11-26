@@ -88,6 +88,43 @@ function validateClassDateTime(classDate, startTime, endTime) {
   return null;
 }
 
+const MAX_RECURRENCE_DAYS = 366;
+const MAX_RECURRENCE_INSTANCES = 60;
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const toUtcMs = (dateStr) => Date.parse(`${dateStr}T00:00:00Z`);
+
+// Date.parse acepta fechas inexistentes como 2099-02-31 y las desplaza; se compara el ida y vuelta.
+const isRealDate = (dateStr) => !Number.isNaN(toUtcMs(dateStr)) && new Date(toUtcMs(dateStr)).toISOString().slice(0, 10) === dateStr;
+
+// Genera las fechas (YYYY-MM-DD) entre startDate y endDate, ambas inclusive, que
+// caen en alguno de los días de semana indicados (0 = domingo ... 6 = sábado).
+function generateRecurringDates(startDate, endDate, weekdays) {
+  const days = new Set(weekdays);
+  const dates = [];
+  for (let ms = toUtcMs(startDate); ms <= toUtcMs(endDate); ms += DAY_MS) {
+    const date = new Date(ms);
+    if (days.has(date.getUTCDay())) dates.push(date.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+// Valida la configuración de la recurrencia. Devuelve un mensaje o null.
+function validateRecurrence({ frequency, weekdays, start_date, end_date }) {
+  if (frequency && frequency !== "weekly") return "Por ahora solo se admite frecuencia semanal";
+  if (!Array.isArray(weekdays) || weekdays.length === 0) return "Debes elegir al menos un día de la semana";
+  if (!weekdays.every((day) => Number.isInteger(day) && day >= 0 && day <= 6)) return "Los días de la semana no son válidos";
+  if (!DATE_PATTERN.test(start_date || "") || !DATE_PATTERN.test(end_date || "")) return "Debes indicar fecha de inicio y de fin";
+  if (!isRealDate(start_date) || !isRealDate(end_date)) return "Las fechas indicadas no son válidas";
+  if (end_date < start_date) return "La fecha de fin no puede ser anterior a la de inicio";
+  // +1 porque el período incluye ambos extremos
+  if ((toUtcMs(end_date) - toUtcMs(start_date)) / DAY_MS + 1 > MAX_RECURRENCE_DAYS) {
+    return `El período no puede superar ${MAX_RECURRENCE_DAYS} días`;
+  }
+  return null;
+}
+
 function validateClassFields({ instructor_id, branch_id, class_name, capacity }) {
   if (!instructor_id) return "Debes seleccionar un instructor";
   if (!branch_id) return "Debes seleccionar una sucursal";
@@ -226,6 +263,99 @@ const createClass = async (req, res) => {
   }
 };
 
+// Crea una clase por cada fecha de la recurrencia. Cada instancia pasa por las
+// mismas validaciones que una clase individual (fecha/hora, disponibilidad,
+// sucursal y solapamiento del instructor). Las inválidas no se crean y se
+// informan junto con el motivo; las válidas se guardan juntas en una transacción.
+const createRecurringClasses = async (req, res) => {
+  try {
+    const { instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, end_date, weekdays, frequency, status } = req.body;
+
+    const fieldsError = validateClassFields({ instructor_id, branch_id, class_name, capacity });
+    if (fieldsError) return res.status(400).json({ error: fieldsError });
+
+    if (!start_time || !end_time) return res.status(400).json({ error: "Debes ingresar hora de inicio y termino" });
+    if (end_time <= start_time) return res.status(400).json({ error: "La hora de termino debe ser mayor a la hora de inicio" });
+
+    const recurrenceError = validateRecurrence({ frequency, weekdays, start_date: class_date, end_date });
+    if (recurrenceError) return res.status(400).json({ error: recurrenceError });
+
+    if (class_date < getArgentinaDate()) {
+      return res.status(400).json({ error: "No se pueden crear o actualizar clases en fechas pasadas" });
+    }
+
+    const dates = generateRecurringDates(class_date, end_date, weekdays);
+    if (dates.length === 0) {
+      return res.status(400).json({ error: "El rango elegido no incluye ninguno de los días de la semana seleccionados" });
+    }
+    if (dates.length > MAX_RECURRENCE_INSTANCES) {
+      return res.status(400).json({ error: `La recurrencia genera ${dates.length} clases; el máximo permitido es ${MAX_RECURRENCE_INSTANCES}` });
+    }
+
+    const valid = [];
+    const conflicts = [];
+    for (const date of dates) {
+      const dateError = validateClassDateTime(date, start_time, end_time);
+      const assignmentError = dateError ? null : await validateInstructorAssignment({
+        instructorId: instructor_id,
+        branchId: branch_id,
+        classDate: date,
+        startTime: start_time,
+        endTime: end_time,
+      });
+
+      // Los errores 400/404 del instructor no dependen de la fecha: se informan una sola vez.
+      if (assignmentError && assignmentError.status !== 409) {
+        return res.status(assignmentError.status).json({ error: assignmentError.error });
+      }
+
+      if (dateError || assignmentError) {
+        conflicts.push({ class_date: date, error: dateError || assignmentError.error });
+      } else {
+        valid.push(date);
+      }
+    }
+
+    const created = [];
+    if (valid.length > 0) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        for (const date of valid) {
+          const result = await client.query(
+            `INSERT INTO classes
+              (instructor_id, branch_id, class_name, capacity, start_time, end_time, class_date, status)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+             RETURNING *`,
+            [instructor_id, branch_id, class_name.trim(), Number(capacity), start_time, end_time, date, status || "scheduled"]
+          );
+          created.push(result.rows[0]);
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    const summary = { total_requested: dates.length, created, conflicts };
+    if (created.length === 0) {
+      return res.status(409).json({ error: "No se pudo crear ninguna clase: todas las fechas tienen conflictos", ...summary });
+    }
+    return res.status(201).json({
+      message: conflicts.length
+        ? `Se crearon ${created.length} de ${dates.length} clases. ${conflicts.length} tuvieron conflictos y no se crearon.`
+        : `Se crearon ${created.length} clases.`,
+      ...summary,
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Error al crear las clases recurrentes" });
+  }
+};
+
 const updateClass = async (req, res) => {
   try {
     return await saveClass(req, res, Number(req.params.id));
@@ -280,6 +410,9 @@ const reactivateClass = async (req, res) => {
 module.exports = {
   getClasses,
   createClass,
+  createRecurringClasses,
+  generateRecurringDates,
+  validateRecurrence,
   updateClass,
   deleteClass,
   reactivateClass,
