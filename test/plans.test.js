@@ -5,6 +5,7 @@ const pool = require("../src/db");
 const { validatePlanInput, describeClassLimit } = require("../src/services/planRules");
 const { createPlan, updatePlan, reactivatePlan } = require("../src/controllers/plans.controllers");
 const { createBooking } = require("../src/controllers/bookings.controllers");
+const { getMyPayments } = require("../src/controllers/payments.controllers");
 
 const createResponse = () => ({
   statusCode: 200,
@@ -198,4 +199,30 @@ test("con lugar disponible dentro del límite la reserva se confirma", async () 
 test("un plan sin límite no bloquea por cantidad de reservas", async () => {
   const res = await book({ classLimit: null, activeBookings: 500 });
   assert.equal(res.statusCode, 201);
+});
+
+test("la membresía devuelve el límite del plan actual aunque el plan esté desactivado", async () => {
+  const originalQuery = pool.query;
+  const originalToken = process.env.MP_ACCESS_TOKEN;
+  const queries = [];
+  delete process.env.MP_ACCESS_TOKEN;
+  pool.query = async (sql) => {
+    queries.push(sql);
+    if (/FROM users u/.test(sql)) {
+      return { rows: [{ plan_id: 3, plan_expiration_date: "2099-01-01", plan_type: "Básico", class_limit: 2 }] };
+    }
+    return { rows: [] };
+  };
+
+  try {
+    const res = createResponse();
+    await getMyPayments({ user: { id: 7 } }, res);
+    assert.equal(res.body.membership.class_limit, 2);
+    const membershipSql = queries.find((sql) => /FROM users u/.test(sql));
+    assert.match(membershipSql, /p\.class_limit/);
+    assert.doesNotMatch(membershipSql, /status/);
+  } finally {
+    pool.query = originalQuery;
+    if (originalToken !== undefined) process.env.MP_ACCESS_TOKEN = originalToken;
+  }
 });

@@ -97,7 +97,6 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
   const membership = data?.membership;
   const days = daysUntilExpiry(membership?.plan_expiration_date);
   const hasActivePlan = !!membership?.plan_id;
-  const currentPlan = plans.find((plan) => Number(plan.plan_id) === Number(membership?.plan_id));
   const canRenew = !hasActivePlan || (days !== null && days <= 5);
 
   const handlePlanClick = (plan) => {
@@ -126,7 +125,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
           <p style={styles.eyebrow}>Plan actual</p>
           <h2 style={styles.heading}>{membership?.plan_type || "Sin membresia activa"}</h2>
           <p style={styles.muted}>Vigencia: {formatDate(membership?.plan_expiration_date)}</p>
-          {currentPlan && <p style={styles.muted}>{describeLimit(currentPlan.class_limit)}</p>}
+          {hasActivePlan && <p style={styles.muted}>{describeLimit(membership.class_limit)}</p>}
           {hasActivePlan && days !== null && days <= 5 && days >= 0 && (
             <p style={styles.expiryWarning}>⚠ Vence en {days === 0 ? "hoy" : `${days} día${days === 1 ? "" : "s"}`} — podés renovar ahora</p>
           )}
