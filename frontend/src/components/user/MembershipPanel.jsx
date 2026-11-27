@@ -17,6 +17,12 @@ const formatDate = (value) => {
   return new Date(`${normalized}T00:00:00`).toLocaleDateString("es-AR");
 };
 
+const describeLimit = (classLimit) => {
+  if (classLimit === null || classLimit === undefined) return "Sin límite de reservas";
+  const n = Number(classLimit);
+  return `Hasta ${n} reserva${n === 1 ? "" : "s"} futura${n === 1 ? "" : "s"} activa${n === 1 ? "" : "s"} a la vez`;
+};
+
 const daysUntilExpiry = (expirationDate) => {
   if (!expirationDate) return null;
   const today = new Date();
@@ -119,6 +125,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
           <p style={styles.eyebrow}>Plan actual</p>
           <h2 style={styles.heading}>{membership?.plan_type || "Sin membresia activa"}</h2>
           <p style={styles.muted}>Vigencia: {formatDate(membership?.plan_expiration_date)}</p>
+          {hasActivePlan && <p style={styles.muted}>{describeLimit(membership.class_limit)}</p>}
           {hasActivePlan && days !== null && days <= 5 && days >= 0 && (
             <p style={styles.expiryWarning}>⚠ Vence en {days === 0 ? "hoy" : `${days} día${days === 1 ? "" : "s"}`} — podés renovar ahora</p>
           )}
@@ -145,6 +152,7 @@ export default function MembershipPanel({ plans, currentUser, onMembershipUpdate
               <h3 style={styles.planTitle}>{plan.plan_type}</h3>
               <p style={styles.price}>{money.format(plan.cost)}</p>
               <p style={styles.muted}>{plan.duration || `${plan.duration_value} ${plan.duration_unit}`}</p>
+              <p style={styles.limit}>{describeLimit(plan.class_limit)}</p>
               <p>{plan.benefits}</p>
               <button
                 type="button"
@@ -215,6 +223,7 @@ const styles = {
   eyebrow: { margin: 0, color: "#64748b", fontSize: "0.82rem", fontWeight: 700, textTransform: "uppercase" },
   heading: { margin: "0.35rem 0", color: "#0f172a" },
   muted: { color: "#64748b" },
+  limit: { margin: "4px 0", fontWeight: 600, color: "#0f766e", fontSize: "0.9rem" },
   expiryWarning: { margin: "8px 0 0", color: "#92400e", background: "#fef3c7", padding: "6px 10px", borderRadius: "6px", fontSize: "0.88rem", fontWeight: 600 },
   notice: { maxWidth: "420px", margin: 0, color: "#475569" },
   pendingNotice: { margin: "1rem 0 0", padding: "10px 12px", borderRadius: "6px", background: "#eff6ff", color: "#1d4ed8", fontWeight: 600 },

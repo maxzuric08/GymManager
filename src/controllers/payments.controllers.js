@@ -9,7 +9,7 @@ const getMyPayments = async (req, res) => {
 
     const [membershipResult, paymentsResult] = await Promise.all([
       pool.query(
-        `SELECT u.plan_id, u.plan_expiration_date, p.plan_type
+        `SELECT u.plan_id, u.plan_expiration_date, p.plan_type, p.class_limit
            FROM users u
            LEFT JOIN plans p ON p.plan_id = u.plan_id
           WHERE u.user_id = $1`,

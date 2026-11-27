@@ -3,9 +3,12 @@ import Modal from "../Modal";
 import FormField from "../FormField";
 import { getPlansRequest, createPlanRequest, updatePlanRequest, deactivatePlanRequest, reactivatePlanRequest } from "../../services/api";
 
+const FORM_FIELDS = ["plan_type", "cost", "duration_value", "duration_unit", "class_limit", "benefits"];
+
 export default function PlansPanel() {
   const [plans, setPlans] = useState([]);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [showForm, setShowForm] = useState(false);
   const [editingPlan, setEditingPlan] = useState(null);
   const [modal, setModal] = useState({ isOpen: false, title: "", message: "", type: "info", onConfirm: null });
@@ -36,10 +39,12 @@ export default function PlansPanel() {
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFieldErrors((current) => (current[e.target.name] ? { ...current, [e.target.name]: undefined } : current));
   };
 
     const handleSubmit = async (e) => {
       e.preventDefault();
+      setFieldErrors({});
 
       try {
         if (editingPlan) {
@@ -62,6 +67,11 @@ export default function PlansPanel() {
           class_limit: "",
         });
       } catch (err) {
+        // El backend indica qué campo falló: se muestra junto al campo en vez de en un modal.
+        if (err.field && FORM_FIELDS.includes(err.field)) {
+          setFieldErrors({ [err.field]: err.message });
+          return;
+        }
         setModal({
           isOpen: true,
           title: "Error",
@@ -75,6 +85,7 @@ export default function PlansPanel() {
 
     const handleEdit = (plan) => {
         setEditingPlan(plan.plan_id);
+        setFieldErrors({});
         setShowForm(true);
         setFormData({
             plan_type: plan.plan_type || "",
@@ -186,26 +197,26 @@ export default function PlansPanel() {
           <p style={styles.legend}>Los campos con <span aria-hidden="true" style={{ color: "#b91c1c" }}>*</span> son obligatorios.</p>
 
           <div style={styles.grid}>
-            <FormField id="plan-type" label="Nombre del plan" required help="Cómo se muestra el plan a los socios. Por ejemplo: Premium.">
+            <FormField id="plan-type" label="Nombre del plan" required help="Cómo se muestra a los socios. No puede repetirse entre planes activos." error={fieldErrors.plan_type}>
               <input name="plan_type" value={formData.plan_type} onChange={handleInputChange} required style={styles.input} />
             </FormField>
-            <FormField id="plan-cost" label="Costo (ARS)" required help="Precio total del plan en pesos.">
+            <FormField id="plan-cost" label="Costo (ARS)" required help="Precio total del plan en pesos. Puede ser 0." error={fieldErrors.cost}>
               <input name="cost" type="number" min="0" value={formData.cost} onChange={handleInputChange} required style={styles.input} />
             </FormField>
-            <FormField id="plan-duration-value" label="Duración" help="Cantidad de días, semanas o meses que dura el plan.">
+            <FormField id="plan-duration-value" label="Duración" help="Número entero. Si lo dejás vacío se toma 1." error={fieldErrors.duration_value}>
               <input name="duration_value" type="number" value={formData.duration_value} onChange={handleInputChange} min="1" style={styles.input} />
             </FormField>
-            <FormField id="plan-duration-unit" label="Unidad de duración" help="Unidad en la que se mide la duración.">
+            <FormField id="plan-duration-unit" label="Unidad de duración" help="Máximos: 3650 días, 520 semanas o 120 meses." error={fieldErrors.duration_unit}>
               <select name="duration_unit" value={formData.duration_unit} onChange={handleInputChange} style={styles.input}>
                 <option value="days">Días</option>
                 <option value="months">Meses</option>
                 <option value="weeks">Semanas</option>
               </select>
             </FormField>
-            <FormField id="plan-class-limit" label="Límite de reservas" help="Máximo de reservas futuras activas a la vez. Vacío significa sin límite.">
-              <input name="class_limit" type="number" value={formData.class_limit} onChange={handleInputChange} style={styles.input} />
+            <FormField id="plan-class-limit" label="Límite de reservas" help="Máximo de reservas futuras activas a la vez (mínimo 1). Vacío = sin límite. Al cancelar una reserva se libera un lugar." error={fieldErrors.class_limit}>
+              <input name="class_limit" type="number" min="1" step="1" placeholder="Sin límite" value={formData.class_limit} onChange={handleInputChange} style={styles.input} />
             </FormField>
-            <FormField id="plan-benefits" label="Beneficios" help="Texto que se muestra al socio y se incluye en el mail de confirmación.">
+            <FormField id="plan-benefits" label="Beneficios" help="Texto para el socio y el mail de confirmación (hasta 500 caracteres)." error={fieldErrors.benefits}>
               <input name="benefits" value={formData.benefits} onChange={handleInputChange} style={styles.input} />
             </FormField>
           </div>
@@ -241,7 +252,7 @@ export default function PlansPanel() {
                   'Mes(es)'
                 }
               </td>
-              <td style={styles.td}>{plan.class_limit}</td>
+              <td style={styles.td}>{plan.class_limit === null || plan.class_limit === undefined ? "Sin límite" : `${plan.class_limit} reserva${Number(plan.class_limit) === 1 ? "" : "s"}`}</td>
               <td style={styles.td}>{plan.status}</td>
               <td style={styles.td}>
                 <button onClick={() => handleEdit(plan)} style={styles.editBtn}>

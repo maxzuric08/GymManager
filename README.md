@@ -170,3 +170,21 @@ docker compose exec backend npm run db:hash-passwords
 ```
 
 El comando es idempotente: saltea las que ya están hasheadas. Además, el login convierte automáticamente a hash cualquier contraseña en texto plano que quede, la primera vez que esa persona inicia sesión.
+
+### Reglas de los planes
+
+Cada plan define reglas estructuradas que el backend valida al crearlo o editarlo y aplica al reservar:
+
+| Regla | Valores válidos | Significado |
+| --- | --- | --- |
+| Nombre | 1 a 50 caracteres, único entre planes activos | Cómo se muestra a los socios |
+| Costo | Número entre 0 y 99.999.999,99 | Precio total en pesos |
+| Duración y unidad | Entero mayor a 0 en días (hasta 3650), semanas (520) o meses (120) | Define el vencimiento; el texto de duración se genera solo |
+| Límite de reservas | Entero mayor o igual a 1, o vacío | Máximo de reservas futuras activas a la vez |
+| Beneficios | Texto opcional de hasta 500 caracteres | Se muestra al socio y en el mail de confirmación |
+
+**Límite vacío = sin límite.** El socio puede tener cualquier cantidad de reservas futuras activas. El valor 0 no se admite. Cancelar una reserva libera un lugar del límite.
+
+Si se baja el límite de un plan que ya tienen socios, no se les cancelan las reservas existentes: el nuevo límite solo impide reservar más hasta volver a quedar por debajo.
+
+Cuando una reserva se bloquea por el límite, el socio ve cuál es su plan, cuál es el límite y cuántas reservas activas ya tiene.
