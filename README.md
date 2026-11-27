@@ -11,6 +11,65 @@ automáticos, gestionar pagos/detectar atrasos en estos, entre otros.
 
 Este proyecto **no está pensado para** creación de rutinas, o gestión personal de cada cliente, sino para la administración general de una empresa de un gimnasio.
 
+## Despliegue público en Render
+
+El repositorio incluye [render.yaml](./render.yaml), que crea una API Docker,
+un sitio estático Vite y PostgreSQL administrado. Render asigna URLs públicas
+`*.onrender.com`; no se necesita dominio propio. La API se publica en
+`/health`, que devuelve `200` cuando también puede consultar PostgreSQL.
+
+### Variables de producción
+
+Render genera `JWT_SECRET` y enlaza `DATABASE_URL` desde la base administrada.
+En el dashboard configurá los siguientes valores como secretos, nunca en Git:
+
+| Variable | Uso |
+| --- | --- |
+| `FRONTEND_URL`, `APP_URL`, `CORS_ORIGINS` | URL pública del sitio frontend. `CORS_ORIGINS` puede contener varios orígenes separados por coma. |
+| `BACKEND_PUBLIC_URL` | URL pública de la API; se usa para el webhook de Mercado Pago. |
+| `EMAIL_USER`, `EMAIL_PASSWORD` | Cuenta SMTP/Gmail para notificaciones y confirmación de plan. |
+| `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` | Credenciales **sandbox** y secreto del webhook de Mercado Pago. |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | Recomendaciones IA, exclusivamente del lado servidor. |
+| `DEMO_ADMIN_USERNAME`, `DEMO_ADMIN_PASSWORD` | Cuenta administrativa privada para la demostración. |
+| `DEMO_USER_USERNAME`, `DEMO_USER_PASSWORD`, `DEMO_USER_EMAIL`, `DEMO_USER_DNI` | Socio privado sin membresía, destinado al checkout sandbox. |
+| `DEMO_MEMBER_USERNAME`, `DEMO_MEMBER_PASSWORD`, `DEMO_MEMBER_EMAIL`, `DEMO_MEMBER_DNI` | Socio privado con plan activo y una reserva para mostrar el dashboard poblado. |
+| `DB_SSL` | Definila en `true` únicamente si la URL de PostgreSQL elegida exige TLS. |
+
+`VITE_API_URL` es la única variable del frontend y debe contener la URL pública
+de la API. No uses prefijos `VITE_` para secretos: Vite los incorpora en el
+bundle enviado al navegador.
+
+### Crear y publicar
+
+1. En Render, creá un Blueprint desde este repositorio y elegí la rama `dev`
+   después de hacer merge del pull request. Completá los secretos solicitados
+   por `render.yaml`.
+2. Una vez creada la API, copiá su URL en `VITE_API_URL`, `BACKEND_PUBLIC_URL`.
+   Copiá la URL del Static Site en `FRONTEND_URL`, `APP_URL`, `CORS_ORIGINS` y
+   volvé a desplegar ambos servicios.
+3. En Mercado Pago sandbox, registrá
+   `https://<api>.onrender.com/payments/webhook` como URL de notificación.
+4. El arranque de la API ejecuta `npm run db:bootstrap` de forma idempotente.
+   El hook inicial ejecuta una única vez `npm run db:seed-demo`, con los datos
+   privados configurados en Render. Para repetirlo de forma intencional, usá
+   la Shell de Render y ejecutá `npm run db:seed-demo`.
+
+Para rollback, seleccioná el último deploy saludable de cada servicio en
+Render y hacé **Rollback**. La base de datos es persistente: no se elimina ni
+se repuebla durante un rollback.
+
+### Checklist de smoke test
+
+- Abrir `https://<api>.onrender.com/health` y guardar una captura de la
+  respuesta `{ "status": "ok", "database": "ok" }`.
+- Iniciar sesión con las cuentas privadas del demo; crear un plan y una clase
+  recurrente, y verificar las instancias futuras creadas.
+- Reservar y cancelar una instancia de la serie recurrente.
+- Como socio, seleccionar un plan, completar checkout sandbox y confirmar
+  webhook, membresía y correo de confirmación con vencimiento.
+- Enviar una consulta de recomendaciones IA y confirmar que la clave no aparece
+  en el navegador ni en la respuesta.
+
 ## Entorno local con Docker
 
 Al usar `docker compose` en desarrollo, Docker carga el esquema y los datos

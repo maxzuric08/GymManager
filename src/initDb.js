@@ -1,11 +1,11 @@
 const pool = require("./db");
 
-const initializeDatabase = async () => {
+const initializeDatabase = async (db = pool) => {
   try {
     console.log("Initializing database tables...");
 
     // Create medical_certificates table
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS medical_certificates (
         medical_certificate_id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -24,7 +24,7 @@ const initializeDatabase = async () => {
     console.log("✓ medical_certificates table created");
 
     // Create bookings table if it doesn't exist
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS bookings (
         booking_id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
@@ -36,14 +36,14 @@ const initializeDatabase = async () => {
     console.log("✓ bookings table created");
 
     // Add plan_expiration_date column to users table if it doesn't exist
-    await pool.query(`
+    await db.query(`
       ALTER TABLE users
       ADD COLUMN IF NOT EXISTS plan_expiration_date DATE;
     `);
     console.log("✓ plan_expiration_date column added to users");
 
     // Add duration fields to plans table
-    await pool.query(`
+    await db.query(`
       ALTER TABLE plans
       ADD COLUMN IF NOT EXISTS duration_value INTEGER DEFAULT 1,
       ADD COLUMN IF NOT EXISTS duration_unit VARCHAR(20) DEFAULT 'months';
@@ -51,25 +51,25 @@ const initializeDatabase = async () => {
     console.log("✓ duration_value and duration_unit columns added to plans");
 
     // Add status column to instructors table
-    await pool.query(`
+    await db.query(`
       ALTER TABLE instructors
       ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
     `);
     console.log("✓ status column added to instructors");
 
-    await pool.query(`
+    await db.query(`
       ALTER TABLE attendance
       ADD COLUMN IF NOT EXISTS marked_by_instructor INTEGER REFERENCES instructors(instructor_id);
     `);
     console.log("Attendance instructor marker added");
 
-    await pool.query(`
+    await db.query(`
       ALTER TABLE payments
       ADD COLUMN IF NOT EXISTS checkout_url TEXT;
     `);
     console.log("Payment checkout URL added");
 
-    await pool.query(`
+    await db.query(`
       CREATE TABLE IF NOT EXISTS membership_notification_runs (
         notification_run_id SERIAL PRIMARY KEY,
         notification_type VARCHAR(50) NOT NULL,
@@ -107,11 +107,11 @@ const initializeDatabase = async () => {
     console.log("✓ membership notification audit tables created");
 
     // Create index for better query performance
-    await pool.query(`
+    await db.query(`
       CREATE INDEX IF NOT EXISTS idx_medical_certificates_user_id
       ON medical_certificates(user_id);
     `);
-    await pool.query(`
+    await db.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS medical_certificates_one_active_per_user
       ON medical_certificates(user_id)
       WHERE status IN ('pending', 'approved');
@@ -119,11 +119,19 @@ const initializeDatabase = async () => {
     console.log("✓ indexes created");
 
     console.log("\n✅ Database initialization complete!");
-    process.exit(0);
   } catch (error) {
     console.error("❌ Error initializing database:", error);
-    process.exit(1);
+    throw error;
   }
 };
 
-initializeDatabase();
+if (require.main === module) {
+  initializeDatabase()
+    .then(() => pool.end())
+    .catch(async () => {
+      await pool.end().catch(() => {});
+      process.exitCode = 1;
+    });
+}
+
+module.exports = { initializeDatabase };

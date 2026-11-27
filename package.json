@@ -7,6 +7,8 @@
     "test": "node --test",
     "db:init": "psql -U postgres -d gymmanager -f ./database/gymmanager.sql",
     "db:migrate": "node src/initDb.js",
+    "db:bootstrap": "node src/dbBootstrap.js",
+    "db:seed-demo": "node scripts/seed-production-demo.js",
     "db:hash-passwords": "node scripts/hash-passwords.js"
   },
   "keywords": [],
